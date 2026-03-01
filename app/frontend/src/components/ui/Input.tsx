@@ -71,9 +71,12 @@ export function Input({
           <button
             type="button"
             onClick={togglePasswordVisibility}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none bg-transparent z-10"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             tabIndex={-1}
+            style={{
+              right: '0.75rem' // Override any conflicting styles
+            }}
           >
             {showPassword ? (
               <EyeOff className="w-4 h-4" />
