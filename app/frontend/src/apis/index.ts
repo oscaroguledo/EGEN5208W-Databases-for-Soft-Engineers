@@ -1,15 +1,18 @@
-const API_BASE = (import.meta as any).env.VITE_API_BASE || 'http://localhost:8000';
+import axios from 'axios';
 
-async function handleResponse(res: Response) {
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
-  if (!res.ok) {
-    const err = (data && (data.detail || data.message)) || res.statusText || 'API error';
-    throw new Error(err);
+export const API_BASE = (import.meta as any).env.VITE_API_BASE || 'http://localhost:8000';
+
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { 'Content-Type': 'application/json' }
+});
+
+export function handleAxiosResponse(res: any) {
+  const data = res?.data;
+  if (!res || res.status >= 400) {
+    throw new Error((data && (data.detail || data.message)) || res.statusText || 'API error');
   }
-  // FastAPI responses use { status, message, data }
   return data && data.data !== undefined ? data.data : data;
 }
 
-export { API_BASE, handleResponse };
+export default api;
