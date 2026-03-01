@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIcon, TargetIcon, CalendarIcon, UsersIcon } from 'lucide-react';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
 import { DashboardSkeleton } from '../../components/ui/Skeleton';
 import {
@@ -53,6 +54,11 @@ export function DashboardPage({
 
   const member = members.find((m) => m.user_id === currentUser.user_id);
   console.log('Found member:', member, 'Looking for user_id:', currentUser.user_id);
+  const mid = member?.member_id ?? -1;
+  const activeGoals = fitnessGoals.filter(
+    (g) => g.member_id === mid && g.is_active
+  );
+  const goalsPagination = usePagination(activeGoals, 4);
 
   if (!member) {
     return (
@@ -73,7 +79,6 @@ export function DashboardPage({
   }
 
   if (loading) return <DashboardSkeleton />;
-  const mid = member.member_id;
   const myMetrics = healthMetrics.filter((m) => m.member_id === mid);
   const metricTypes = [...new Set(myMetrics.map((m) => m.metric_type))];
   const latestMetrics = metricTypes.map(
@@ -86,9 +91,7 @@ export function DashboardPage({
       new Date(a.recorded_at).getTime()
     )[0]
   );
-  const activeGoals = fitnessGoals.filter(
-    (g) => g.member_id === mid && g.is_active
-  );
+  // activeGoals and pagination are initialized above to keep hooks stable
   const classesAttended = classRegistrations.filter(
     (r) => r.member_id === mid && r.attended
   ).length;
@@ -260,32 +263,44 @@ export function DashboardPage({
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Add one in Profile → Goals.
                 </p>
-              </div> :
+              </div> : (
 
-            <div className="space-y-3">
-                {activeGoals.map((g) =>
-              <div
-                key={g.goal_id}
-                className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
+              <>
+                <div className="space-y-3">
+                  {goalsPagination.paginated.map((g) => (
+                    <div
+                      key={g.goal_id}
+                      className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
 
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        {g.goal_type}
-                      </span>
-                      <Badge variant="teal">Active</Badge>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {g.description}
-                    </p>
-                    {g.target_value > 0 &&
-                <div className="mt-1.5 text-xs font-semibold text-teal-600 dark:text-teal-400">
-                        Target: {g.target_value} {g.target_unit}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {g.goal_type}
+                        </span>
+                        <Badge variant="teal">Active</Badge>
                       </div>
-                }
-                  </div>
-              )}
-              </div>
-            }
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {g.description}
+                      </p>
+                      {g.target_value > 0 && (
+                        <div className="mt-1.5 text-xs font-semibold text-teal-600 dark:text-teal-400">
+                          Target: {g.target_value} {g.target_unit}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
+                  <Pagination
+                    currentPage={goalsPagination.currentPage}
+                    totalPages={goalsPagination.totalPages}
+                    onPageChange={goalsPagination.setCurrentPage}
+                    totalItems={goalsPagination.totalItems}
+                    pageSize={goalsPagination.pageSize}
+                  />
+                </div>
+              </>
+            )
           </Card>
         </div>
 

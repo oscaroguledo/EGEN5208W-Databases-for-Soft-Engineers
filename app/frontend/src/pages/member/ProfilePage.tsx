@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserIcon, TargetIcon, HeartPulseIcon } from 'lucide-react';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -96,9 +97,9 @@ export function ProfilePage({
     return () => clearTimeout(t);
   }, []);
   const member = members.find((m) => m.user_id === currentUser.user_id)!;
-  const myGoals = fitnessGoals.filter(
-    (g) => g.member_id === member?.member_id && g.is_active
-  );
+  const mid = member?.member_id ?? -1;
+  const myGoals = fitnessGoals.filter((g) => g.member_id === mid && g.is_active);
+  const goalsPagination = usePagination(myGoals, 4);
   const [profileForm, setProfileForm] = useState({
     full_name: member?.full_name || '',
     phone: member?.phone || ''
@@ -388,42 +389,54 @@ export function ProfilePage({
             </Card>
           </div>
           <Card>
-            <CardHeader
-            title="Active Goals"
-            subtitle={`${myGoals.length} active`} />
+              <CardHeader
+                title="Active Goals"
+                subtitle={`${myGoals.length} active`} />
 
-            {myGoals.length === 0 ?
-          <div className="py-6 text-center">
-                <TargetIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-400 dark:text-slate-500">
-                  No active goals yet.
-                </p>
-              </div> :
+              {myGoals.length === 0 ? (
+                <div className="py-6 text-center">
+                  <TargetIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400 dark:text-slate-500">
+                    No active goals yet.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {goalsPagination.paginated.map((g) => (
+                      <div
+                        key={g.goal_id}
+                        className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
 
-          <div className="space-y-3">
-                {myGoals.map((g) =>
-            <div
-              key={g.goal_id}
-              className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
-
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        {g.goal_type}
-                      </span>
-                      <Badge variant="teal">Active</Badge>
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                      {g.description}
-                    </div>
-                    {g.target_value > 0 &&
-              <div className="text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                        Target: {g.target_value} {g.target_unit}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            {g.goal_type}
+                          </span>
+                          <Badge variant="teal">Active</Badge>
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {g.description}
+                        </div>
+                        {g.target_value > 0 && (
+                          <div className="text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                            Target: {g.target_value} {g.target_unit}
+                          </div>
+                        )}
                       </div>
-              }
+                    ))}
                   </div>
-            )}
-              </div>
-          }
+
+                  <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
+                    <Pagination
+                      currentPage={goalsPagination.currentPage}
+                      totalPages={goalsPagination.totalPages}
+                      onPageChange={goalsPagination.setCurrentPage}
+                      totalItems={goalsPagination.totalItems}
+                      pageSize={goalsPagination.pageSize}
+                    />
+                  </div>
+                </>
+              )}
           </Card>
         </div>
       }

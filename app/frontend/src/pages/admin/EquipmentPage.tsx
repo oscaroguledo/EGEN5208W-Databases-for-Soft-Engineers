@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { WrenchIcon, PlusIcon, FilterIcon, Trash2Icon } from 'lucide-react';
+import { WrenchIcon, PlusIcon, FilterIcon, Trash2Icon, PencilIcon } from 'lucide-react';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
@@ -48,11 +48,17 @@ export function EquipmentPage({
     status: 'operational' as EquipmentStatus,
     notes: ''
   });
+  const [editing, setEditing] = useState<Equipment | null>(null);
+  const [editingForm, setEditingForm] = useState({
+    equipment_name: '',
+    room_id: '',
+    status: 'operational' as EquipmentStatus,
+    notes: ''
+  });
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(t);
   }, []);
-  if (loading) return <EquipmentSkeleton />;
   const displayed =
   filter === 'needs-attention' ?
   equipment.filter((e) => e.status !== 'operational') :
@@ -65,6 +71,7 @@ export function EquipmentPage({
     label: r.room_name
   }));
   const pagination = usePagination(displayed, 8);
+  if (loading) return <EquipmentSkeleton />;
   const handleStatusChange = (eq: Equipment, newStatus: EquipmentStatus) => {
     const updated: Equipment = {
       ...eq,
@@ -76,6 +83,39 @@ export function EquipmentPage({
     };
     onUpdateEquipment(updated);
     toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
+  };
+  const openEdit = (eq: Equipment) => {
+    setEditing(eq);
+    setEditingForm({
+      equipment_name: eq.equipment_name,
+      room_id: String(eq.room_id),
+      status: eq.status,
+      notes: eq.notes || ''
+    });
+    setModalOpen(true);
+  };
+  const handleUpdateSubmit = (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!editing) return;
+    if (!editingForm.equipment_name.trim() || !editingForm.room_id) {
+      toast.error('Equipment name and room are required.');
+      return;
+    }
+    setSavingEquipment(true);
+    setTimeout(() => {
+      const updated: Equipment = {
+        ...editing,
+        equipment_name: editingForm.equipment_name,
+        room_id: parseInt(editingForm.room_id),
+        status: editingForm.status,
+        notes: editingForm.notes
+      };
+      onUpdateEquipment(updated);
+      setSavingEquipment(false);
+      setModalOpen(false);
+      toast.success(`Equipment "${updated.equipment_name}" updated.`);
+      setEditing(null);
+    }, 300);
   };
   const handleAddEquipment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +164,10 @@ export function EquipmentPage({
         </div>
         <Button
           variant="primary"
-          onClick={() => setModalOpen(true)}
+          onClick={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
           className="self-start">
 
           <PlusIcon className="w-4 h-4" />
@@ -198,8 +241,48 @@ export function EquipmentPage({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="max-h-[60vh] overflow-y-auto">
+          {/* Mobile: stacked list */}
+          <div className="space-y-3 md:hidden px-4 sm:px-6">
+            {pagination.paginated.map((eq) => {
+              const room = rooms.find((r) => r.room_id === eq.room_id);
+              return (
+                <div key={eq.equipment_id} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3`}> 
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{eq.equipment_name}</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">ID: {eq.equipment_id} • {room?.room_name}</div>
+                    </div>
+                    <div className="text-right">
+                      <StatusBadge status={eq.status} />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Last: {eq.last_maintained || '—'}</div>
+                  {eq.notes && <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{eq.notes}</div>}
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(eq)} title="Edit">
+                      <PencilIcon className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteEquipment(eq)} title="Delete">
+                      <Trash2Icon className="w-4 h-4 text-red-400" />
+                    </Button>
+                    <div className="ml-auto">
+                      <Dropdown
+                        value={eq.status}
+                        onChange={(v) => handleStatusChange(eq, v as EquipmentStatus)}
+                        options={STATUS_OPTIONS}
+                        className="w-36"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop/tablet: regular table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full table-auto">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                 <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -271,13 +354,17 @@ export function EquipmentPage({
                       {eq.notes || '—'}
                     </td>
                     <td className="px-4 sm:px-6 py-4">
-                      <Dropdown
-                        value={eq.status}
-                        onChange={(v) =>
-                        handleStatusChange(eq, v as EquipmentStatus)
-                        }
-                        options={STATUS_OPTIONS}
-                        className="w-36" />
+                      <div className="flex items-center gap-2">
+                        <Dropdown
+                          value={eq.status}
+                          onChange={(v) => handleStatusChange(eq, v as EquipmentStatus)}
+                          options={STATUS_OPTIONS}
+                          className="w-36"
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(eq)} title="Edit">
+                          <PencilIcon className="w-3.5 h-3.5 text-slate-500" />
+                        </Button>
+                      </div>
 
                     </td>
                     <td className="px-4 sm:px-6 py-4">
@@ -294,84 +381,77 @@ export function EquipmentPage({
 
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
-        {pagination.totalPages > 1 &&
         <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-            <Pagination
+          <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
             onPageChange={pagination.setCurrentPage}
             totalItems={pagination.totalItems}
-            pageSize={pagination.pageSize} />
-
-          </div>
-        }
+            pageSize={pagination.pageSize}
+          />
+        </div>
       </Card>
 
       <Modal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Add Equipment"
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
+        title={editing ? 'Edit Equipment' : 'Add Equipment'}
         footer={
         <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
+            <Button variant="secondary" onClick={() => {
+              setModalOpen(false);
+              setEditing(null);
+            }}>
               Cancel
             </Button>
             <Button
             variant="primary"
             loading={savingEquipment}
-            onClick={handleAddEquipment as any}>
+            onClick={(editing ? (handleUpdateSubmit as any) : (handleAddEquipment as any))}>
 
-              {savingEquipment ? 'Saving…' : 'Save Equipment'}
+              {savingEquipment ? 'Saving…' : editing ? 'Save Changes' : 'Save Equipment'}
             </Button>
           </>
         }>
 
-        <form onSubmit={handleAddEquipment} className="space-y-4">
+        <form onSubmit={editing ? handleUpdateSubmit : handleAddEquipment} className="space-y-4">
           <Input
             label="Equipment Name *"
             placeholder="e.g. Rowing Machine #1"
-            value={newForm.equipment_name}
+            value={editing ? editingForm.equipment_name : newForm.equipment_name}
             onChange={(e) =>
-            setNewForm((f) => ({
-              ...f,
-              equipment_name: e.target.value
-            }))
+              editing ? setEditingForm((f) => ({ ...f, equipment_name: e.target.value })) : setNewForm((f) => ({ ...f, equipment_name: e.target.value }))
             } />
 
           <Dropdown
             label="Room *"
-            value={newForm.room_id}
+            value={editing ? editingForm.room_id : newForm.room_id}
             onChange={(v) =>
-            setNewForm((f) => ({
-              ...f,
-              room_id: v
-            }))
+              editing ? setEditingForm((f) => ({ ...f, room_id: v })) : setNewForm((f) => ({ ...f, room_id: v }))
             }
             options={roomOptions}
             placeholder="Select room" />
 
           <Dropdown
-            label="Initial Status"
-            value={newForm.status}
+            label={editing ? 'Status' : 'Initial Status'}
+            value={editing ? editingForm.status : newForm.status}
             onChange={(v) =>
-            setNewForm((f) => ({
-              ...f,
-              status: v as EquipmentStatus
-            }))
+              editing ? setEditingForm((f) => ({ ...f, status: v as EquipmentStatus })) : setNewForm((f) => ({ ...f, status: v as EquipmentStatus }))
             }
             options={STATUS_OPTIONS} />
 
           <Textarea
             label="Notes"
             placeholder="Describe the issue or equipment details..."
-            value={newForm.notes}
+            value={editing ? editingForm.notes : newForm.notes}
             onChange={(e) =>
-            setNewForm((f) => ({
-              ...f,
-              notes: e.target.value
-            }))
+              editing ? setEditingForm((f) => ({ ...f, notes: e.target.value })) : setNewForm((f) => ({ ...f, notes: e.target.value }))
             } />
 
         </form>

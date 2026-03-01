@@ -50,8 +50,7 @@ export function AvailabilityPage({
     end_time: ''
   });
   
-  // Call pagination hook unconditionally to preserve hooks order
-  const pagination = usePagination([], 6); // Initialize with empty array, will be updated
+  // compute trainer and slots; call pagination hook unconditionally
   
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 400);
@@ -59,20 +58,20 @@ export function AvailabilityPage({
   }, []);
   
   const trainer = trainers.find((t) => t.user_id === currentUser.user_id);
+  const mySlots = trainer
+    ? availability
+        .filter((a) => a.trainer_id === trainer.trainer_id)
+        .sort((a, b) => a.available_date.localeCompare(b.available_date) || a.start_time.localeCompare(b.start_time))
+    : [];
+
+  const pagination = usePagination(mySlots, 6);
+
   if (!trainer)
-  return (
-    <div className="text-slate-500 dark:text-slate-400">
-        Trainer profile not found.
-      </div>);
+    return (
+      <div className="text-slate-500 dark:text-slate-400">Trainer profile not found.</div>
+    );
 
   if (loading) return <AvailabilitySkeleton />;
-  const mySlots = availability.
-  filter((a) => a.trainer_id === trainer.trainer_id).
-  sort(
-    (a, b) =>
-    a.available_date.localeCompare(b.available_date) ||
-    a.start_time.localeCompare(b.start_time)
-  );
   
   // We'll use mySlots directly in the display instead of the hook's paginated data
   // to avoid hook order issues while maintaining functionality
@@ -232,114 +231,48 @@ export function AvailabilityPage({
           <Card padding="none">
             <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  My Availability Slots
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {mySlots.length} slot{mySlots.length !== 1 ? 's' : ''} defined
-                </p>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">My Availability Slots</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{mySlots.length} slot{mySlots.length !== 1 ? 's' : ''} defined</p>
               </div>
               <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/40 rounded-lg flex items-center justify-center">
                 <ClockIcon className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               </div>
             </div>
 
-            {mySlots.length === 0 ?
-            <div className="px-6 py-14 text-center">
+            {mySlots.length === 0 ? (
+              <div className="px-6 py-14 text-center">
                 <ClockIcon className="w-12 h-12 text-slate-200 dark:text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-500 dark:text-slate-400 font-medium">
-                  No availability slots defined yet.
-                </p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
-                  Add your first slot using the form.
-                </p>
-              </div> :
-
-            <>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">No availability slots defined yet.</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Add your first slot using the form.</p>
+              </div>
+            ) : (
+              <div>
                 <div className="divide-y divide-slate-50 dark:divide-slate-700">
-                  {mySlots.map((slot) =>
-                <div
-                  key={slot.availability_id}
-                  className="px-4 sm:px-6 py-4">
-
-                      {editingId === slot.availability_id ?
-                  <div className="flex flex-wrap items-end gap-3">
-                          <Input
-                      label="Date"
-                      type="date"
-                      value={editForm.available_date}
-                      onChange={(e) =>
-                      setEditForm((f) => ({
-                        ...f,
-                        available_date: e.target.value
-                      }))
-                      }
-                      className="w-36" />
-
-                          <Input
-                      label="Start"
-                      type="time"
-                      value={editForm.start_time}
-                      onChange={(e) =>
-                      setEditForm((f) => ({
-                        ...f,
-                        start_time: e.target.value
-                      }))
-                      }
-                      className="w-28" />
-
-                          <Input
-                      label="End"
-                      type="time"
-                      value={editForm.end_time}
-                      onChange={(e) =>
-                      setEditForm((f) => ({
-                        ...f,
-                        end_time: e.target.value
-                      }))
-                      }
-                      className="w-28" />
-
+                      {pagination.paginated.map((slot) => (
+                    <div key={slot.availability_id} className="px-4 sm:px-6 py-4">
+                      {editingId === slot.availability_id ? (
+                        <div className="flex flex-wrap items-end gap-3">
+                          <Input label="Date" type="date" value={editForm.available_date} onChange={(e) => setEditForm((f) => ({ ...f, available_date: e.target.value }))} className="w-36" />
+                          <Input label="Start" type="time" value={editForm.start_time} onChange={(e) => setEditForm((f) => ({ ...f, start_time: e.target.value }))} className="w-28" />
+                          <Input label="End" type="time" value={editForm.end_time} onChange={(e) => setEditForm((f) => ({ ...f, end_time: e.target.value }))} className="w-28" />
                           <div className="flex gap-2">
-                            <Button
-                        size="sm"
-                        variant="primary"
-                        loading={updateLoading}
-                        onClick={() => handleUpdate(slot.availability_id)}>
-
+                            <Button size="sm" variant="primary" loading={updateLoading} onClick={() => handleUpdate(slot.availability_id)}>
                               <CheckIcon className="w-3.5 h-3.5" />
                             </Button>
-                            <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setEditingId(null)}>
-
+                            <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
                               <XIcon className="w-3.5 h-3.5" />
                             </Button>
                           </div>
-                        </div> :
-
-                  <div className="flex items-center justify-between group">
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between group">
                           <div className="flex items-center gap-4">
-                            <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{
-                          background:
-                          'linear-gradient(135deg, #ccfbf1, #99f6e4)'
-                        }}>
-
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #ccfbf1, #99f6e4)' }}>
                               <ClockIcon className="w-5 h-5 text-teal-600" />
                             </div>
                             <div>
                               <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                                {new Date(
-                            slot.available_date + 'T00:00:00'
-                          ).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                                {new Date(slot.available_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
                               </div>
                               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block" />
@@ -348,89 +281,33 @@ export function AvailabilityPage({
                             </div>
                           </div>
                           <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => startEdit(slot)}>
-
+                            <Button size="sm" variant="ghost" onClick={() => startEdit(slot)}>
                               <EditIcon className="w-3.5 h-3.5" />
                             </Button>
-                            <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(slot.availability_id)}>
-
+                            <Button size="sm" variant="ghost" onClick={() => handleDelete(slot.availability_id)}>
                               <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
                             </Button>
                           </div>
-                    </div>
-                  </div> :
-
-            <div className="flex items-center justify-between group">
-                    <div className="flex items-center gap-4">
-                      <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background:
-                    'linear-gradient(135deg, #ccfbf1, #99f6e4)'
-                  }}>
-
-                        <ClockIcon className="w-5 h-5 text-teal-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                          {new Date(
-                      slot.available_date + 'T00:00:00'
-                    ).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block" />
-                          {slot.start_time} – {slot.end_time}
-                        </div>
-                      </div>
+                      )}
                     </div>
-                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => startEdit(slot)}>
-
-                        <EditIcon className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleDelete(slot.availability_id)}>
-
-                        <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
-                      </Button>
-                    </div>
-                  </div>
-            }
+                  ))}
+                </div>
+                <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+                  <Pagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={pagination.setCurrentPage}
+                    totalItems={pagination.totalItems}
+                    pageSize={pagination.pageSize}
+                  />
+                </div>
               </div>
-          )}
-          </div>
-          {mySlots.length > 6 &&
-        <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-              <Pagination
-            currentPage={1}
-            totalPages={Math.ceil(mySlots.length / 6)}
-            onPageChange={() => {}}
-            totalItems={mySlots.length}
-            pageSize={6}
-          />   </div>
-        }
-        </>
-      }
-    </Card>
-  </div>
-</div>
-</div>);
-    </div>);
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
 
 }

@@ -16,15 +16,7 @@ export function Pagination({
   pageSize,
   className = ''
 }: PaginationProps) {
-  // Remove the early return to always show pagination for better UX
-  // if (totalPages <= 1) return null;
-  
-  console.log('Pagination component rendering:', {
-    currentPage,
-    totalPages,
-    totalItems,
-    pageSize
-  });
+  // Always show pagination for better UX
   const getPageNumbers = (): (number | '...')[] => {
     const pages: (number | '...')[] = [];
     if (totalPages <= 7) {
@@ -47,14 +39,9 @@ export function Pagination({
     <div
       className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-1 ${className}`}>
 
-      {/* Debug indicator */}
-      <div className="bg-blue-500 text-white px-2 py-1 text-xs">
-        Pagination: Page {currentPage} of {totalPages} (Items: {totalItems})
-      </div>
-
-      {/* Count info */}
-      {totalItems != null && from != null && to != null ?
-      <p className="text-xs text-slate-500 dark:text-slate-400 order-2 sm:order-1">
+      {/* Count info (detailed on sm+, compact on xs) */}
+      {totalItems != null && from != null && to != null ? (
+        <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 order-2 sm:order-1">
           Showing{' '}
           <span className="font-semibold text-slate-700 dark:text-slate-300">
             {from}–{to}
@@ -64,10 +51,11 @@ export function Pagination({
             {totalItems}
           </span>{' '}
           results
-        </p> :
-
-      <div className="order-2 sm:order-1" />
-      }
+        </p>
+      ) : (
+        <div className="order-2 sm:order-1" />
+      )}
+      
 
       {/* Page buttons */}
       <div className="flex items-center gap-1 order-1 sm:order-2">
@@ -80,26 +68,29 @@ export function Pagination({
           <ChevronLeftIcon className="w-4 h-4" />
         </button>
 
-        {getPageNumbers().map((page, idx) =>
-        page === '...' ?
-        <span
-          key={`ellipsis-${idx}`}
-          className="w-8 h-8 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">
+        {/* Large screen: show page numbers */}
+        <div className="hidden sm:flex items-center gap-1">
+          {getPageNumbers().map((page, idx) =>
+            page === '...' ? (
+              <span
+                key={`ellipsis-${idx}`}
+                className="w-8 h-8 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">
+                …
+              </span>
+            ) : (
+              <button
+                key={page}
+                onClick={() => onPageChange(page as number)}
+                className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${page === currentPage ? 'bg-teal-600 text-white border border-teal-600 shadow-sm' : 'border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                aria-label={`Page ${page}`}
+                aria-current={page === currentPage ? 'page' : undefined}>
+                {page}
+              </button>
+            )
+          )}
+        </div>
 
-              …
-            </span> :
-
-        <button
-          key={page}
-          onClick={() => onPageChange(page as number)}
-          className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${page === currentPage ? 'bg-teal-600 text-white border border-teal-600 shadow-sm' : 'border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-          aria-label={`Page ${page}`}
-          aria-current={page === currentPage ? 'page' : undefined}>
-
-              {page}
-            </button>
-
-        )}
+        {/* small screens: show only prev/next buttons */}
 
         <button
           onClick={() => onPageChange(currentPage + 1)}

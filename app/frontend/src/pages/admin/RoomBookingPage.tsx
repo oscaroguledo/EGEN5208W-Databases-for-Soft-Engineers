@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { Badge } from '../../components/ui/Badge';
 import { RoomBookingSkeleton } from '../../components/ui/Skeleton';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { toast } from 'sonner';
 import {
   Room,
@@ -41,10 +42,15 @@ export function RoomBookingPage({
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [targetType, setTargetType] = useState<'session' | 'class'>('session');
   const [targetId, setTargetId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 450);
     return () => clearTimeout(t);
   }, []);
+  // top-level filtered rooms and pagination must be initialized before any early returns
+  const filteredRooms = rooms.filter((r) => r.room_name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const roomsPagination = usePagination(filteredRooms, 6);
+
   if (loading) return <RoomBookingSkeleton />;
   const getRoomBookings = (roomId: number) => ({
     sessions: personalSessions.filter(
@@ -54,6 +60,57 @@ export function RoomBookingPage({
       (c) => c.room_id === roomId && c.status !== 'cancelled'
     )
   });
+
+  // Component to render paginated bookings for a room
+  function RoomBookingsList({
+    sessions,
+    classes,
+    pageSize = 5
+  }: {
+    sessions: PersonalSession[];
+    classes: GroupClass[];
+    pageSize?: number;
+  }) {
+    type Booking = { kind: 'session'; data: PersonalSession } | { kind: 'class'; data: GroupClass };
+
+    const combined: Booking[] = [
+      ...sessions.map((s) => ({ kind: 'session' as const, data: s })),
+      ...classes.map((c) => ({ kind: 'class' as const, data: c }))
+    ].sort((a, b) => {
+      const dateA = a.kind === 'session' ? a.data.session_date : a.data.class_date;
+      const dateB = b.kind === 'session' ? b.data.session_date : b.data.class_date;
+      const timeA = a.kind === 'session' ? a.data.start_time : a.data.start_time;
+      const timeB = b.kind === 'session' ? b.data.start_time : b.data.start_time;
+      return dateA.localeCompare(dateB) || timeA.localeCompare(timeB);
+    });
+
+    return (
+      <div>
+        <div className="space-y-1.5">
+          {combined.map((b) => {
+            if (b.kind === 'session') {
+              const m = members.find((x) => x.member_id === b.data.member_id);
+              return (
+                <div key={`s-${b.data.session_id}`} className="flex items-center gap-2 text-xs py-1 px-2.5 bg-teal-50 dark:bg-teal-900/30 rounded-lg flex-wrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">{b.data.session_date} {b.data.start_time}–{b.data.end_time}</span>
+                  <span className="text-slate-400 dark:text-slate-500">· Session: {m?.full_name}</span>
+                </div>
+              );
+            }
+            return (
+              <div key={`c-${b.data.class_id}`} className="flex items-center gap-2 text-xs py-1 px-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-wrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">{b.data.class_date} {b.data.start_time}–{b.data.end_time}</span>
+                <span className="text-slate-400 dark:text-slate-500">· Class: {b.data.class_name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const checkRoomConflict = (
   roomId: number,
   date: string,
@@ -310,8 +367,16 @@ export function RoomBookingPage({
                 Current bookings per room
               </p>
             </div>
+            <div className="px-4 sm:px-6 pt-4">
+              <Input
+                placeholder="Search rooms…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="mb-4"
+              />
+            </div>
             <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {rooms.map((room) => {
+              {roomsPagination.paginated.map((room) => {
                 const { sessions, classes } = getRoomBookings(room.room_id);
                 const totalBookings = sessions.length + classes.length;
                 return (
@@ -345,50 +410,25 @@ export function RoomBookingPage({
                       </Badge>
                     </div>
 
-                    {totalBookings === 0 ?
-                    <div className="text-xs text-slate-400 dark:text-slate-500 ml-14">
-                        No bookings
-                      </div> :
-
-                    <div className="ml-14 space-y-1.5">
-                        {sessions.map((s) => {
-                        const m = members.find(
-                          (x) => x.member_id === s.member_id
-                        );
-                        return (
-                          <div
-                            key={`s-${s.session_id}`}
-                            className="flex items-center gap-2 text-xs py-1 px-2.5 bg-teal-50 dark:bg-teal-900/30 rounded-lg flex-wrap">
-
-                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />
-                              <span className="text-slate-600 dark:text-slate-300 font-medium">
-                                {s.session_date} {s.start_time}–{s.end_time}
-                              </span>
-                              <span className="text-slate-400 dark:text-slate-500">
-                                · Session: {m?.full_name}
-                              </span>
-                            </div>);
-
-                      })}
-                        {classes.map((c) =>
-                      <div
-                        key={`c-${c.class_id}`}
-                        className="flex items-center gap-2 text-xs py-1 px-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-wrap">
-
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                            <span className="text-slate-600 dark:text-slate-300 font-medium">
-                              {c.class_date} {c.start_time}–{c.end_time}
-                            </span>
-                            <span className="text-slate-400 dark:text-slate-500">
-                              · Class: {c.class_name}
-                            </span>
-                          </div>
-                      )}
+                    {totalBookings === 0 ? (
+                      <div className="text-xs text-slate-400 dark:text-slate-500 ml-14">No bookings</div>
+                    ) : (
+                      <div className="ml-14">
+                        <RoomBookingsList sessions={sessions} classes={classes} pageSize={4} />
                       </div>
-                    }
+                    )}
                   </div>);
 
               })}
+            </div>
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+              <Pagination
+                currentPage={roomsPagination.currentPage}
+                totalPages={roomsPagination.totalPages}
+                onPageChange={roomsPagination.setCurrentPage}
+                totalItems={roomsPagination.totalItems}
+                pageSize={roomsPagination.pageSize}
+              />
             </div>
           </Card>
         </div>
