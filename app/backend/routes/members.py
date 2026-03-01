@@ -141,6 +141,29 @@ async def get_health_history(
         status_code=200
     )
 
+@router.get("/list", response_model=APIResponse[List])
+async def list_members(
+    skip: int = 0,
+    limit: int = 20,
+    gender: str = None,
+    current_user: User = Depends(require_admin),  # Only admin can list all members
+    db: AsyncSession = Depends(get_db)
+):
+    """List all members with pagination (admin only)"""
+    members = await MemberService.list_members(
+        db=db,
+        skip=skip,
+        limit=limit,
+        gender=gender
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Members list retrieved",
+        data=members,
+        status_code=200
+    )
+
 @router.get("/dashboard-optimized", response_model=APIResponse[dict])
 async def get_member_dashboard_optimized(
     days_ahead: int = 30,

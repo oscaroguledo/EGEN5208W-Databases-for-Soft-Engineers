@@ -132,6 +132,29 @@ async def get_all_equipment(
         status_code=200
     )
 
+@router.get("/equipment/list", response_model=APIResponse[List])
+async def list_equipment_paginated(
+    skip: int = 0,
+    limit: int = 20,
+    status_filter: str = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all equipment with pagination (admin only)"""
+    equipment = await AdminStaffService.list_equipments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        status=status_filter
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Equipment list retrieved with pagination",
+        data=equipment,
+        status_code=200
+    )
+
 @router.put("/equipment/{equipment_id}/status", response_model=APIResponse[dict])
 async def update_equipment_status(
     equipment_id: UUID,
