@@ -45,8 +45,18 @@ export function Input({
     showPasswordToggle,
     propsType: props.type,
     showPassword,
-    finalType: inputType
+    finalType: inputType,
+    inputValue: props.value
   });
+
+  // Force re-render when type changes to ensure value is preserved
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  
+  React.useEffect(() => {
+    if (inputRef.current && showPasswordToggle && props.type === 'password') {
+      inputRef.current.setAttribute('type', inputType as string);
+    }
+  }, [inputType, showPasswordToggle, props.type]);
 
   return (
     <div className="flex flex-col gap-1 relative">
@@ -60,6 +70,7 @@ export function Input({
       <div className="relative">
         <input
           id={inputId}
+          ref={inputRef}
           type={inputType}
           className={`
             w-full px-3 py-2 text-sm rounded-lg border
