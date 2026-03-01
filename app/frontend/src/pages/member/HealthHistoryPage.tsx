@@ -5,11 +5,13 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { HealthHistorySkeleton } from '../../components/ui/Skeleton';
 import { User, Member, HealthMetric } from '../../data/types';
+
 interface HealthHistoryPageProps {
   currentUser: User;
   members: Member[];
   healthMetrics: HealthMetric[];
 }
+
 export function HealthHistoryPage({
   currentUser,
   members,
@@ -17,53 +19,68 @@ export function HealthHistoryPage({
 }: HealthHistoryPageProps) {
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
+
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 450);
     return () => clearTimeout(t);
   }, []);
+
   const member = members.find((m) => m.user_id === currentUser.user_id);
-  if (!member)
-  return (
-    <div className="text-slate-500 dark:text-slate-400">
-        Member not found.
-      </div>);
+
+  if (!member) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="text-center">
+          <div className="text-slate-500 dark:text-slate-400 mb-4">
+            <div className="text-lg font-semibold">Member Profile Not Found</div>
+            <div className="text-sm mt-2">
+              Unable to find your member profile. Please contact support or try logging out and logging back in.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <HealthHistorySkeleton />;
+
   const myMetrics = healthMetrics.
-  filter((m) => m.member_id === member.member_id).
-  filter((m) => !filterType || m.metric_type === filterType).
-  sort(
-    (a, b) =>
-    new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
-  );
-  const pagination = usePagination(myMetrics, 8);
-  const metricTypes = [
-  ...new Set(
-    healthMetrics.
     filter((m) => m.member_id === member.member_id).
-    map((m) => m.metric_type)
-  )];
+    filter((m) => !filterType || m.metric_type === filterType).
+    sort(
+      (a, b) =>
+      new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
+    );
+
+  const pagination = usePagination(myMetrics, 8);
+
+  const metricTypes = [
+    ...new Set(
+      healthMetrics.
+        filter((m) => m.member_id === member.member_id).
+        map((m) => m.metric_type)
+    )
+  ];
 
   const filterOptions = [
-  {
-    value: '',
-    label: 'All Types'
-  },
-  ...metricTypes.map((t) => ({
-    value: t,
-    label: t
-  }))];
+    {
+      value: '',
+      label: 'All Types'
+    },
+    ...metricTypes.map((type) => ({
+      value: type,
+      label: type
+    }))
+  ];
 
   const typeColors: Record<string, string> = {
     Weight: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-    'Heart Rate':
-    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    'Heart Rate': 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
     BMI: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
-    'Blood Pressure':
-    'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
-    'Body Fat':
-    'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
+    'Blood Pressure': 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    'Body Fat': 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
   };
+
   const typeDotColors: Record<string, string> = {
     Weight: 'bg-blue-400',
     'Heart Rate': 'bg-red-400',
@@ -71,6 +88,7 @@ export function HealthHistoryPage({
     'Blood Pressure': 'bg-orange-400',
     'Body Fat': 'bg-teal-400'
   };
+
   return (
     <div>
       <div className="mb-6">
@@ -78,59 +96,19 @@ export function HealthHistoryPage({
           Health History
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          View all your health metric records
+          Track your fitness progress over time
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <Card padding="none">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  Metric Records
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {myMetrics.length} records found
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <FilterIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <Dropdown
-                  value={filterType}
-                  onChange={setFilterType}
-                  options={filterOptions}
-                  placeholder="All Types"
-                  className="w-40" />
-
-              </div>
-            </div>
-
-            {myMetrics.length === 0 ?
-            <div className="px-6 py-16 text-center">
-                <ActivityIcon className="w-12 h-12 text-slate-200 dark:text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-500 dark:text-slate-400 font-medium">
-                  No health records found
-                </p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
-                  {filterType ?
-                `No records for "${filterType}". Try a different filter.` :
-                'Log your first metric in Profile → Log Metric.'}
-                </p>
-              </div> :
-
-            <>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
-                        <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          #
-                        </th>
-                        <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          Metric Type
-                        </th>
-                        <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FilterIcon className="w-4 h-4 text-slate-400" />
+          <Dropdown
+            value={filterType}
+            onChange={setFilterType}
+            options={filterOptions}
+            placeholder="Filter by type"
+          />
                           Value
                         </th>
                         <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
