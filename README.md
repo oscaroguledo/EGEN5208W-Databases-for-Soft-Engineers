@@ -27,32 +27,63 @@ A comprehensive web-based application for managing health and fitness club opera
 
 ## Database Setup
 
-### 1. Create Database
+### Option 1: Manual Database Setup
+#### 1. Create Database
 ```sql
 CREATE DATABASE gym_db;
 CREATE USER gym_user WITH PASSWORD 'your_password';
 GRANT ALL PRIVILEGES ON DATABASE gym_db TO gym_user;
 ```
 
-### 2. Execute DDL Script
+#### 2. Execute DDL Script
 ```bash
-psql -d gym_db -U gym_user -f DDL.sql
+psql -d gym_db -U gym_user -f sql/DDL.sql
 ```
 
-### 3. Execute DML Script (Sample Data)
+#### 3. Execute DML Script (Sample Data)
 ```bash
-psql -d gym_db -U gym_user -f DML.sql
+psql -d gym_db -U gym_user -f sql/DML.sql
 ```
+
+### Option 2: Docker Compose (Recommended)
+#### 1. Start All Services with Docker Compose
+```bash
+# Navigate to the app directory
+cd app
+
+# Start all services (database, backend, frontend)
+docker-compose up -d
+
+# View logs to monitor startup
+docker-compose logs -f
+
+# Stop services when done
+docker-compose down
+```
+
+#### 2. Docker Services
+- **Database**: PostgreSQL 13 on port 5432 (auto-initialized with DDL/DML)
+- **Backend**: FastAPI on port 8000 (auto-restarts on code changes)
+- **Frontend**: Web interface on port 3000 (auto-restarts on code changes)
+
+#### 3. Access Points
+- **API Documentation**: http://localhost:8000/docs
+- **Frontend Application**: http://localhost:3000
+- **Database**: localhost:5432 (user: gym_user, password: gym_password)
 
 ## Application Setup
 
-### 1. Clone/Download the Project
+### Option 1: Docker Compose (Recommended)
+See "Option 2: Docker Compose" in Database Setup section above.
+
+### Option 2: Manual Setup
+#### 1. Clone/Download the Project
 ```bash
 # Navigate to the project directory
-cd /path/to/EGEN5208W-Databases-for-Soft-Engineers/backend
+cd /path/to/EGEN5208W-Databases-for-Soft-Engineers
 ```
 
-### 2. Create Virtual Environment
+#### 2. Create Virtual Environment
 ```bash
 python -m venv venv
 
@@ -63,13 +94,13 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+#### 3. Install Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r app/backend/requirements.txt
 ```
 
-### 4. Environment Configuration
-Create a `.env` file in the `backend` directory:
+#### 4. Environment Configuration
+Create a `.env` file in the project root:
 
 ```env
 # Database Configuration
@@ -85,12 +116,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
 ```
 
-### 5. Run Database Migration
-The application will automatically create tables on startup, but you can verify:
-
+#### 5. Run Database Migration
 ```bash
 python -c "
 import asyncio
+import sys
+sys.path.append('app/backend')
 from core.db import engine, Base
 
 async def create_tables():
@@ -104,8 +135,17 @@ asyncio.run(create_tables())
 
 ## Running the Application
 
-### Development Mode
+### Docker Compose (Recommended)
 ```bash
+cd app
+docker-compose up -d
+```
+
+### Manual Development Mode
+```bash
+# Navigate to backend directory
+cd app/backend
+
 # Start the FastAPI development server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -113,7 +153,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ### Production Mode
 ```bash
 # Start with uvicorn workers
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ## API Documentation
