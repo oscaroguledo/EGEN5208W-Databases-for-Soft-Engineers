@@ -40,6 +40,13 @@ export function Input({
   const inputType = showPasswordToggle && props.type === 'password' 
     ? (showPassword ? 'text' : 'password')
     : props.type;
+  
+  console.log('Input type logic:', {
+    showPasswordToggle,
+    propsType: props.type,
+    showPassword,
+    finalType: inputType
+  });
 
   return (
     <div className="flex flex-col gap-1 relative">
