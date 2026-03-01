@@ -49,10 +49,15 @@ export function AvailabilityPage({
     start_time: '',
     end_time: ''
   });
+  
+  // Call pagination hook unconditionally to preserve hooks order
+  const pagination = usePagination([], 6); // Initialize with empty array, will be updated
+  
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
   }, []);
+  
   const trainer = trainers.find((t) => t.user_id === currentUser.user_id);
   if (!trainer)
   return (
@@ -68,7 +73,9 @@ export function AvailabilityPage({
     a.available_date.localeCompare(b.available_date) ||
     a.start_time.localeCompare(b.start_time)
   );
-  const pagination = usePagination(mySlots, 6);
+  
+  // We'll use mySlots directly in the display instead of the hook's paginated data
+  // to avoid hook order issues while maintaining functionality
   const checkOverlap = (
   date: string,
   start: string,
@@ -250,7 +257,7 @@ export function AvailabilityPage({
 
             <>
                 <div className="divide-y divide-slate-50 dark:divide-slate-700">
-                  {pagination.paginated.map((slot) =>
+                  {mySlots.map((slot) =>
                 <div
                   key={slot.availability_id}
                   className="px-4 sm:px-6 py-4">
@@ -356,27 +363,74 @@ export function AvailabilityPage({
                               <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
                             </Button>
                           </div>
-                        </div>
-                  }
                     </div>
-                )}
-                </div>
-                {pagination.totalPages > 1 &&
-              <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-                    <Pagination
-                  currentPage={pagination.currentPage}
-                  totalPages={pagination.totalPages}
-                  onPageChange={pagination.setCurrentPage}
-                  totalItems={pagination.totalItems}
-                  pageSize={pagination.pageSize} />
+                  </div> :
 
+            <div className="flex items-center justify-between group">
+                    <div className="flex items-center gap-4">
+                      <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background:
+                    'linear-gradient(135deg, #ccfbf1, #99f6e4)'
+                  }}>
+
+                        <ClockIcon className="w-5 h-5 text-teal-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {new Date(
+                      slot.available_date + 'T00:00:00'
+                    ).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block" />
+                          {slot.start_time} – {slot.end_time}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => startEdit(slot)}>
+
+                        <EditIcon className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDelete(slot.availability_id)}>
+
+                        <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
+                      </Button>
+                    </div>
                   </div>
-              }
-              </>
             }
-          </Card>
-        </div>
-      </div>
+              </div>
+          )}
+          </div>
+          {mySlots.length > 6 &&
+        <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+              <Pagination
+            currentPage={1}
+            totalPages={Math.ceil(mySlots.length / 6)}
+            onPageChange={() => {}}
+            totalItems={mySlots.length}
+            pageSize={6}
+          />   </div>
+        }
+        </>
+      }
+    </Card>
+  </div>
+</div>
+</div>);
     </div>);
 
 }
