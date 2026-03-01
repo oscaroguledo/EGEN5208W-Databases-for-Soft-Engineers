@@ -207,3 +207,57 @@ async def update_equipment_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid equipment status"
         )
+
+@router.get("/sessions/list", response_model=APIResponse[List])
+async def list_training_sessions(
+    skip: int = 0,
+    limit: int = 20,
+    member_id: UUID = None,
+    trainer_id: UUID = None,
+    status_filter: str = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List training sessions with pagination (admin only)"""
+    sessions = await AdminStaffService.list_sessions(
+        db=db,
+        skip=skip,
+        limit=limit,
+        member_id=member_id,
+        trainer_id=trainer_id,
+        status=status_filter
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Training sessions list retrieved with pagination",
+        data=sessions,
+        status_code=200
+    )
+
+@router.get("/payments/list", response_model=APIResponse[List])
+async def list_payments(
+    skip: int = 0,
+    limit: int = 20,
+    member_id: UUID = None,
+    subscription_id: UUID = None,
+    status_filter: str = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List payments with pagination (admin only)"""
+    payments = await AdminStaffService.list_payments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        member_id=member_id,
+        subscription_id=subscription_id,
+        status=status_filter
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Payments list retrieved with pagination",
+        data=payments,
+        status_code=200
+    )

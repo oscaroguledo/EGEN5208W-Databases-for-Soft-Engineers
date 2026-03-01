@@ -6,10 +6,10 @@ from uuid import UUID
 from core.db import get_db
 from core.auth import require_member, PermissionChecker
 from core.response import APIResponse
+from models.users.user import User, UserRole
+from models.users.members import Member
 
 from services.users.members import MemberService
-from models.users.user import User
-from models.users.members import Member
 
 router = APIRouter(prefix="/members", tags=["members"])
 
@@ -108,6 +108,28 @@ async def update_fitness_goals(
     return APIResponse(
         status="success",
         message="Fitness goals updated",
+        data=goals,
+        status_code=200
+    )
+
+@router.get("/goals/list", response_model=APIResponse[List])
+async def list_fitness_goals(
+    skip: int = 0,
+    limit: int = 20,
+    member_id: UUID = None,  # Admin can list all goals, member can list own
+    current_user: User = Depends(require_member),
+    db: AsyncSession = Depends(get_db)
+):
+    """List fitness goals with pagination"""
+    # If not admin, only allow listing own goals
+    if current_user.role != UserRole.admin:
+        member_id = current_user.id
+    
+    goals = await MemberService.list_fitness_goals(db, member_id, skip, limit)
+    
+    return APIResponse(
+        status="success",
+        message="Fitness goals list retrieved with pagination",
         data=goals,
         status_code=200
     )
