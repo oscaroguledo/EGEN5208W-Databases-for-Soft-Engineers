@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon } from 'lucide-react';
+import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon, SearchIcon } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { DashboardSkeleton } from '../../components/ui/Skeleton';
 import { User, Member, GroupClass, Trainer, Room } from '../../data/types';
@@ -24,9 +25,7 @@ export function ClassesPage({
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<GroupClass[]>([]);
   const [enrolling, setEnrolling] = useState<number | null>(null);
-  
-  // Call pagination hook unconditionally to preserve hooks order
-  const pagination = usePagination(classes, 6); // Show 6 classes per page
+  const [searchTerm, setSearchTerm] = useState('');
   
   useEffect(() => {
     const fetchClasses = async () => {
@@ -237,6 +236,16 @@ export function ClassesPage({
 
   if (loading) return <DashboardSkeleton />;
 
+  // Filter classes based on search term
+  const filteredClasses = classes.filter(classItem => 
+    classItem.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getTrainerName(classItem.trainer_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Update pagination to use filtered classes
+  const pagination = usePagination(filteredClasses, 6); // Show 6 classes per page
+
   return (
     <div>
       <div className="mb-6">
@@ -248,15 +257,32 @@ export function ClassesPage({
         </p>
       </div>
 
-      {classes.length === 0 ? (
+      {/* Search Bar */}
+      <div className="mb-6">
+        <Input
+          placeholder="Search classes by name, instructor, or room..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
+
+      {/* Results count */}
+      {searchTerm && (
+        <div className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          Found {filteredClasses.length} class{filteredClasses.length !== 1 ? 'es' : ''} matching "{searchTerm}"
+        </div>
+      )}
+
+      {filteredClasses.length === 0 ? (
         <Card>
           <div className="py-8 text-center">
             <CalendarIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400 dark:text-slate-500">
-              No classes available at the moment.
+              {searchTerm ? 'No classes found matching your search.' : 'No classes available at the moment.'}
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Check back later for new class schedules.
+              {searchTerm ? 'Try adjusting your search terms.' : 'Check back later for new class schedules.'}
             </p>
           </div>
         </Card>

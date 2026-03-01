@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIcon, FilterIcon } from 'lucide-react';
+import { ActivityIcon, FilterIcon, SearchIcon } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Dropdown } from '../../components/ui/Dropdown';
+import { Input } from '../../components/ui/Input';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { HealthHistorySkeleton } from '../../components/ui/Skeleton';
 import { User, Member, HealthMetric } from '../../data/types';
@@ -25,6 +26,7 @@ export function HealthHistoryPage({
   
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 450);
@@ -37,6 +39,11 @@ export function HealthHistoryPage({
     ? healthMetrics
         .filter((m) => m.member_id === member.member_id)
         .filter((m) => !filterType || m.metric_type === filterType)
+        .filter((m) => !searchTerm || 
+          m.metric_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.unit.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.value.toString().includes(searchTerm)
+        )
         .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
     : [];
 
@@ -122,7 +129,7 @@ export function HealthHistoryPage({
         </p>
       </div>
 
-      {/* Filter and Pagination Controls */}
+      {/* Filter and Search Controls */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
         <div className="flex items-center gap-3">
           <FilterIcon className="w-4 h-4 text-slate-400" />
@@ -133,7 +140,24 @@ export function HealthHistoryPage({
             placeholder="Filter by type"
           />
         </div>
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Search metrics..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
       </div>
+
+      {/* Results count */}
+      {(searchTerm || filterType) && (
+        <div className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          Found {myMetrics.length} metric{myMetrics.length !== 1 ? 's' : ''} 
+          {searchTerm && ` matching "${searchTerm}"`}
+          {filterType && ` of type "${filterType}"`}
+        </div>
+      )}
 
       {/* Metrics Grid */}
       <Card>
@@ -141,10 +165,16 @@ export function HealthHistoryPage({
           <div className="py-8 text-center">
             <ActivityIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400 dark:text-slate-500">
-              No health metrics recorded yet.
+              {(searchTerm || filterType) 
+                ? 'No health metrics found matching your criteria.' 
+                : 'No health metrics recorded yet.'
+              }
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Start tracking your metrics in Profile.
+              {(searchTerm || filterType) 
+                ? 'Try adjusting your search or filter criteria.' 
+                : 'Start tracking your metrics in Profile.'
+              }
             </p>
           </div>
         ) : (
