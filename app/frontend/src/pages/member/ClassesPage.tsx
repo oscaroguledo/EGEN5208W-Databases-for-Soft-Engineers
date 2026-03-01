@@ -27,6 +27,9 @@ export function ClassesPage({
   const [enrolling, setEnrolling] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Call pagination hook unconditionally to preserve hooks order
+  const pagination = usePagination(classes, 6); // Show 6 classes per page
+  
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -243,8 +246,14 @@ export function ClassesPage({
     getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Update pagination to use filtered classes
-  const pagination = usePagination(filteredClasses, 6); // Show 6 classes per page
+  // Update pagination to use filtered classes - but we need to call this conditionally
+  // This is problematic for hooks order, so we'll use the original pagination with all classes
+  // and filter the displayed results instead
+  const paginatedFilteredClasses = pagination.paginated.filter(classItem => 
+    classItem.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getTrainerName(classItem.trainer_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div>
@@ -289,7 +298,7 @@ export function ClassesPage({
       ) : (
         <>
           <div className="space-y-4">
-            {pagination.paginated.map((classItem) => (
+            {paginatedFilteredClasses.map((classItem) => (
               <Card key={classItem.class_id}>
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -362,10 +371,10 @@ export function ClassesPage({
           <div className="mt-6 flex justify-center">
             <Pagination
               currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
+              totalPages={Math.max(1, Math.ceil(filteredClasses.length / 6))}
               onPageChange={pagination.setCurrentPage}
-              totalItems={pagination.totalItems}
-              pageSize={pagination.pageSize}
+              totalItems={filteredClasses.length}
+              pageSize={6}
             />
           </div>
         </>
