@@ -3,6 +3,7 @@ import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { DashboardSkeleton } from '../../components/ui/Skeleton';
 import { User, Member, GroupClass, Trainer, Room } from '../../data/types';
 
@@ -28,7 +29,7 @@ export function ClassesPage({
     const fetchClasses = async () => {
       try {
         // In a real app, this would fetch from the API
-        // For now, we'll use mock data
+        // For now, we'll use mock data with more classes to demonstrate pagination
         const mockClasses: GroupClass[] = [
           {
             class_id: 1,
@@ -65,6 +66,114 @@ export function ClassesPage({
             max_capacity: 25,
             current_enrollment: 25,
             status: "full"
+          },
+          {
+            class_id: 4,
+            class_name: "Pilates",
+            trainer_id: 3,
+            room_id: 1,
+            class_date: "2026-03-16",
+            start_time: "08:00",
+            end_time: "09:00",
+            max_capacity: 12,
+            current_enrollment: 8,
+            status: "scheduled"
+          },
+          {
+            class_id: 5,
+            class_name: "Boxing",
+            trainer_id: 2,
+            room_id: 2,
+            class_date: "2026-03-16",
+            start_time: "19:30",
+            end_time: "20:30",
+            max_capacity: 10,
+            current_enrollment: 7,
+            status: "scheduled"
+          },
+          {
+            class_id: 6,
+            class_name: "Zumba",
+            trainer_id: 3,
+            room_id: 3,
+            class_date: "2026-03-17",
+            start_time: "17:00",
+            end_time: "18:00",
+            max_capacity: 30,
+            current_enrollment: 22,
+            status: "scheduled"
+          },
+          {
+            class_id: 7,
+            class_name: "CrossFit",
+            trainer_id: 1,
+            room_id: 1,
+            class_date: "2026-03-17",
+            start_time: "06:00",
+            end_time: "07:00",
+            max_capacity: 15,
+            current_enrollment: 15,
+            status: "full"
+          },
+          {
+            class_id: 8,
+            class_name: "Meditation",
+            trainer_id: 3,
+            room_id: 2,
+            class_date: "2026-03-17",
+            start_time: "12:00",
+            end_time: "12:30",
+            max_capacity: 20,
+            current_enrollment: 5,
+            status: "scheduled"
+          },
+          {
+            class_id: 9,
+            class_name: "Strength Training",
+            trainer_id: 2,
+            room_id: 3,
+            class_date: "2026-03-18",
+            start_time: "16:00",
+            end_time: "17:00",
+            max_capacity: 12,
+            current_enrollment: 9,
+            status: "scheduled"
+          },
+          {
+            class_id: 10,
+            class_name: "Aqua Fitness",
+            trainer_id: 1,
+            room_id: 1,
+            class_date: "2026-03-18",
+            start_time: "11:00",
+            end_time: "12:00",
+            max_capacity: 18,
+            current_enrollment: 14,
+            status: "scheduled"
+          },
+          {
+            class_id: 11,
+            class_name: "Kickboxing",
+            trainer_id: 3,
+            room_id: 2,
+            class_date: "2026-03-18",
+            start_time: "18:30",
+            end_time: "19:30",
+            max_capacity: 20,
+            current_enrollment: 18,
+            status: "full"
+          },
+          {
+            class_id: 12,
+            class_name: "Barre",
+            trainer_id: 2,
+            room_id: 3,
+            class_date: "2026-03-19",
+            start_time: "09:30",
+            end_time: "10:30",
+            max_capacity: 15,
+            current_enrollment: 11,
+            status: "scheduled"
           }
         ];
         setClasses(mockClasses);
@@ -125,6 +234,9 @@ export function ClassesPage({
 
   if (loading) return <DashboardSkeleton />;
 
+  // Add pagination for classes
+  const pagination = usePagination(classes, 6); // Show 6 classes per page
+
   return (
     <div>
       <div className="mb-6">
@@ -149,75 +261,88 @@ export function ClassesPage({
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {classes.map((classItem) => (
-            <Card key={classItem.class_id}>
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                      {classItem.class_name}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      <div className="flex items-center gap-1">
-                        <CalendarIcon className="w-4 h-4" />
-                        {new Date(classItem.class_date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <ClockIcon className="w-4 h-4" />
-                        {classItem.start_time} - {classItem.end_time}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MapPinIcon className="w-4 h-4" />
-                        {getRoomName(classItem.room_id)}
+        <>
+          <div className="space-y-4">
+            {pagination.paginated.map((classItem) => (
+              <Card key={classItem.class_id}>
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        {classItem.class_name}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-1">
+                          <CalendarIcon className="w-4 h-4" />
+                          {new Date(classItem.class_date).toLocaleDateString()}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <ClockIcon className="w-4 h-4" />
+                          {classItem.start_time} - {classItem.end_time}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MapPinIcon className="w-4 h-4" />
+                          {getRoomName(classItem.room_id)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {getStatusBadge(classItem.status, classItem.current_enrollment, classItem.max_capacity)}
-                    <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
-                      <UsersIcon className="w-4 h-4" />
-                      {classItem.current_enrollment}/{classItem.max_capacity}
+                    <div className="flex flex-col items-end gap-2">
+                      {getStatusBadge(classItem.status, classItem.current_enrollment, classItem.max_capacity)}
+                      <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+                        <UsersIcon className="w-4 h-4" />
+                        {classItem.current_enrollment}/{classItem.max_capacity}
+                      </div>
                     </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600 dark:text-slate-300">
-                    Instructor: <span className="font-medium">{getTrainerName(classItem.trainer_id)}</span>
                   </div>
                   
-                  <Button
-                    onClick={() => handleEnroll(classItem.class_id)}
-                    disabled={
-                      enrolling === classItem.class_id ||
-                      classItem.status === 'full' ||
-                      classItem.status === 'cancelled' ||
-                      classItem.status === 'completed' ||
-                      classItem.current_enrollment >= classItem.max_capacity
-                    }
-                    className="min-w-[100px]"
-                  >
-                    {enrolling === classItem.class_id ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Enrolling...
-                      </div>
-                    ) : classItem.current_enrollment >= classItem.max_capacity ? (
-                      'Full'
-                    ) : classItem.status === 'cancelled' ? (
-                      'Cancelled'
-                    ) : classItem.status === 'completed' ? (
-                      'Completed'
-                    ) : (
-                      'Enroll'
-                    )}
-                  </Button>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                      Instructor: <span className="font-medium">{getTrainerName(classItem.trainer_id)}</span>
+                    </div>
+                    
+                    <Button
+                      onClick={() => handleEnroll(classItem.class_id)}
+                      disabled={
+                        enrolling === classItem.class_id ||
+                        classItem.status === 'full' ||
+                        classItem.status === 'cancelled' ||
+                        classItem.status === 'completed' ||
+                        classItem.current_enrollment >= classItem.max_capacity
+                      }
+                      className="min-w-[100px]"
+                    >
+                      {enrolling === classItem.class_id ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Enrolling...
+                        </div>
+                      ) : classItem.current_enrollment >= classItem.max_capacity ? (
+                        'Full'
+                      ) : classItem.status === 'cancelled' ? (
+                        'Cancelled'
+                      ) : classItem.status === 'completed' ? (
+                        'Completed'
+                      ) : (
+                        'Enroll'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="mt-6 flex justify-center">
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setCurrentPage}
+              totalItems={pagination.totalItems}
+              pageSize={pagination.pageSize}
+            />
+          </div>
+        </>
       )}
     </div>
   );
