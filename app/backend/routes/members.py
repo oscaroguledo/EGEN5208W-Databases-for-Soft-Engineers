@@ -114,20 +114,14 @@ async def update_fitness_goals(
 
 @router.get("/health-history", response_model=APIResponse[List])
 async def get_health_history(
-    metric_type: str = None,
+    skip: int = 0,
     limit: int = 100,
+    metric_type: str = None,
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get member's health metrics history"""
-    # Check permission
-    if not PermissionChecker.can_view_health_metrics(current_user, current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
-    
-    metrics = await MemberService.get_health_history(
+    """Get member's health metrics history with pagination"""
+    metrics = await MemberService.get_health_metrics(
         db=db,
         member_id=current_user.id,
         metric_type=metric_type,
@@ -136,7 +130,7 @@ async def get_health_history(
     
     return APIResponse(
         status="success",
-        message="Health history retrieved",
+        message="Health history retrieved with pagination",
         data=metrics,
         status_code=200
     )

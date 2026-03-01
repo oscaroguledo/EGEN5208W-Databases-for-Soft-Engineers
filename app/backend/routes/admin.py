@@ -102,11 +102,26 @@ async def get_all_equipment_optimized(
 
 @router.get("/equipment", response_model=APIResponse[List])
 async def get_all_equipment(
+    skip: int = 0,
+    limit: int = 20,
     status_filter: str = None,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """View all equipment, optionally filter by maintenance status"""
+    """View all equipment with pagination (admin only)"""
+    equipment = await AdminStaffService.list_equipments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        status=status_filter
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Equipment list retrieved with pagination",
+        data=equipment,
+        status_code=200
+    )
     from models.equipments import Equipment, EquipmentStatus
     from sqlalchemy.future import select
     

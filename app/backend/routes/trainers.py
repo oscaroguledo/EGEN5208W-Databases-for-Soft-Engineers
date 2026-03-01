@@ -81,3 +81,24 @@ async def get_trainer_schedule(
         data=schedule,
         status_code=200
     )
+
+@router.get("/list", response_model=APIResponse[List])
+async def list_trainers(
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(require_admin),  # Only admin can list all trainers
+    db: AsyncSession = Depends(get_db)
+):
+    """List all trainers with pagination (admin only)"""
+    trainers = await TrainerService.list_trainers(
+        db=db,
+        skip=skip,
+        limit=limit
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Trainers list retrieved with pagination",
+        data=trainers,
+        status_code=200
+    )
