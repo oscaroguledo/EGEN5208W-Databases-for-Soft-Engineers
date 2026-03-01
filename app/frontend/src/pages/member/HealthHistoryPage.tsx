@@ -36,6 +36,16 @@ export function HealthHistoryPage({
 
   // Call pagination hook unconditionally to preserve hooks order
   const pagination = usePagination(myMetrics, 8);
+  
+  // Debug pagination data
+  console.log('Pagination Debug:', {
+    myMetricsLength: myMetrics.length,
+    currentPage: pagination.currentPage,
+    totalPages: pagination.totalPages,
+    totalItems: pagination.totalItems,
+    pageSize: pagination.pageSize,
+    paginatedLength: pagination.paginated.length
+  });
 
   // Early returns (render skeleton or not-found) after hooks
   if (!member) {
@@ -164,16 +174,16 @@ export function HealthHistoryPage({
         )}
       </Card>
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="mt-6 flex justify-center">
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            onPageChange={pagination.setCurrentPage}
-          />
-        </div>
-      )}
+      {/* Pagination - Always show for better UX */}
+      <div className="mt-6 flex justify-center">
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.setCurrentPage}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+        />
+      </div>
     </div>
   );
 }
