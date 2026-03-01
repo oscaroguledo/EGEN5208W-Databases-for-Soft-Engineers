@@ -109,68 +109,23 @@ export function HealthHistoryPage({
             options={filterOptions}
             placeholder="Filter by type"
           />
-                          Value
-                        </th>
-                        <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          Unit
-                        </th>
-                        <th className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          Recorded At
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                      {pagination.paginated.map((m) =>
-                    <tr
-                      key={m.metric_id}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors duration-100">
-
-                          <td className="px-4 sm:px-6 py-3.5 text-xs text-slate-400 dark:text-slate-500 font-mono">
-                            {m.metric_id}
-                          </td>
-                          <td className="px-4 sm:px-6 py-3.5">
-                            <div className="flex items-center gap-2">
-                              <span
-                            className={`w-2 h-2 rounded-full flex-shrink-0 ${typeDotColors[m.metric_type] || 'bg-slate-400'}`} />
-
-                              <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[m.metric_type] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-
-                                {m.metric_type}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 sm:px-6 py-3.5 text-sm font-bold text-slate-900 dark:text-slate-100">
-                            {m.value}
-                          </td>
-                          <td className="px-4 sm:px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">
-                            {m.unit}
-                          </td>
-                          <td className="px-4 sm:px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">
-                            {new Date(m.recorded_at).toLocaleString()}
-                          </td>
-                        </tr>
-                    )}
-                    </tbody>
-                  </table>
-                </div>
-                {pagination.totalPages > 1 &&
-              <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-                    <Pagination
-                  currentPage={pagination.currentPage}
-                  totalPages={pagination.totalPages}
-                  onPageChange={pagination.setCurrentPage}
-                  totalItems={pagination.totalItems}
-                  pageSize={pagination.pageSize} />
-
-                  </div>
-              }
-              </>
-            }
-          </Card>
         </div>
+      </div>
 
-        {/* Summary sidebar */}
+      <Card>
+        {pagination.paginated.length === 0 ? (
+          <div className="py-8 text-center">
+            <ActivityIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-sm text-slate-400 dark:text-slate-500">
+              No health metrics recorded yet.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              Start tracking your metrics in Profile.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pagination.paginated.map((m) => (
         <div className="space-y-4">
           <Card>
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
