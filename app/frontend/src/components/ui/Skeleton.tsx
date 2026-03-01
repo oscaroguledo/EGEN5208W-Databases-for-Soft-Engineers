@@ -152,13 +152,37 @@ export function HealthHistorySkeleton() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <TableSkeleton rows={5} cols={5} />
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="p-4 rounded-xl border border-slate-100 dark:border-slate-700"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="w-3 h-3 rounded-full" />
+                  </div>
+
+                  <div className="mb-2">
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="space-y-4">
           <CardSkeleton rows={3} />
         </div>
       </div>
-    </div>);
+    </div>
+  );
 
 }
 export function ScheduleSkeleton() {

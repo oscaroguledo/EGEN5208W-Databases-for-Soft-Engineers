@@ -26,8 +26,18 @@ export function HealthHistoryPage({
   }, []);
   
   const member = members.find((m) => m.user_id === currentUser.user_id);
-  
-  // Early return after hooks are declared
+  // compute metrics safely (may be empty if member not found)
+  const myMetrics = member
+    ? healthMetrics
+        .filter((m) => m.member_id === member.member_id)
+        .filter((m) => !filterType || m.metric_type === filterType)
+        .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
+    : [];
+
+  // Call pagination hook unconditionally to preserve hooks order
+  const pagination = usePagination(myMetrics, 8);
+
+  // Early returns (render skeleton or not-found) after hooks
   if (!member) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -44,17 +54,6 @@ export function HealthHistoryPage({
   }
 
   if (loading) return <HealthHistorySkeleton />;
-  
-  const myMetrics = healthMetrics.
-    filter((m) => m.member_id === member.member_id).
-    filter((m) => !filterType || m.metric_type === filterType).
-    sort(
-      (a, b) =>
-      new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
-    );
-  
-  // Calculate pagination after all other hooks
-  const pagination = usePagination(myMetrics, 8);
   
   const metricTypes = [
     ...new Set(
