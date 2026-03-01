@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layout } from './components/Layout';
 import { PageTransition } from './components/PageTransition';
@@ -187,7 +187,7 @@ export function App() {
   const [previousPage, setPreviousPage] = useState<Page | null>(null);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
-  const [trainers] = useState<Trainer[]>(INITIAL_TRAINERS);
+  const [trainers, setTrainers] = useState<Trainer[]>(INITIAL_TRAINERS);
   const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS);
   const [fitnessGoals, setFitnessGoals] = useState<FitnessGoal[]>(
     INITIAL_FITNESS_GOALS
@@ -208,6 +208,68 @@ export function App() {
     INITIAL_PERSONAL_SESSIONS
   );
   const [equipment, setEquipment] = useState<Equipment[]>(INITIAL_EQUIPMENT);
+  // ─── API hydration: replace local fixtures with backend data when available
+  useEffect(() => {
+    let mounted = true;
+    // minimal safe dynamic imports so the bundle doesn't fail if apis are not present
+    (async () => {
+      try {
+        const [{ me }, membersApi, adminApi, trainersApi] = await Promise.all([
+          import('./apis/auth'),
+          import('./apis/members'),
+          import('./apis/admin'),
+          import('./apis/trainers')
+        ]);
+
+        if (!mounted) return;
+
+        try {
+          const current = await me();
+          if (current && mounted) setCurrentUser((u) => u || current);
+        } catch (e) {
+          // ignore auth/me failure
+        }
+
+        // parallel fetch of lists (best-effort, fall back to existing initial data)
+        const results = await Promise.allSettled([
+          membersApi.listMembers(),
+          trainersApi.listTrainers(),
+          adminApi.listEquipment(),
+          membersApi.listGoals(),
+          membersApi.listHealthHistory()
+        ]);
+
+        if (!mounted) return;
+
+        // listMembers -> results[0]
+        if (results[0].status === 'fulfilled' && Array.isArray((results[0] as any).value)) {
+          setMembers((results[0] as any).value);
+        }
+        // listTrainers -> results[1]
+        if (results[1].status === 'fulfilled' && Array.isArray((results[1] as any).value)) {
+          setTrainers((results[1] as any).value);
+        }
+        // listEquipment -> results[2]
+        if (results[2].status === 'fulfilled' && Array.isArray((results[2] as any).value)) {
+          setEquipment((results[2] as any).value);
+        }
+        // listGoals -> results[3]
+        if (results[3].status === 'fulfilled' && Array.isArray((results[3] as any).value)) {
+          setFitnessGoals((results[3] as any).value);
+        }
+        // listHealthHistory -> results[4]
+        if (results[4].status === 'fulfilled' && Array.isArray((results[4] as any).value)) {
+          setHealthMetrics((results[4] as any).value);
+        }
+      } catch (err) {
+        // network or import errors - don't block the app
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
   // ─── Navigation with auth guards ───────────────────────────────────────────
   const handleNavigate = (page: Page) => {
     if (!currentUser) {
@@ -267,6 +329,35 @@ export function App() {
   setPersonalSessions((ss) =>
   ss.map((x) => x.session_id === s.session_id ? s : x)
   );
+  const handleAddSession = (s: PersonalSession) =>
+  setPersonalSessions((ss) => [...ss, s]);
+  const handleBookSession = async (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; notes?: string }) => {
+    try {
+      const membersApi = await import('./apis/members');
+      const res = await membersApi.bookSession(payload);
+      const created = res && (res.session || res);
+      if (created) {
+        setPersonalSessions((ss) => [...ss, created as PersonalSession]);
+        return created;
+      }
+    } catch (err) {
+      // fallback to local creation
+    }
+    const newId = Math.max(...personalSessions.map((s) => s.session_id), 0) + 1;
+    const created: PersonalSession = {
+      session_id: newId,
+      member_id: currentUser ? currentUser.user_id : -1,
+      trainer_id: parseInt(payload.trainer_id),
+      room_id: parseInt(payload.room_id),
+      session_date: payload.session_date,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      status: 'scheduled',
+      notes: payload.notes || ''
+    };
+    setPersonalSessions((ss) => [...ss, created]);
+    return created;
+  };
   const handleUpdateClass = (c: GroupClass) =>
   setGroupClasses((cs) => cs.map((x) => x.class_id === c.class_id ? c : x));
   const handleAddEquipment = (e: Equipment) => setEquipment((eq) => [...eq, e]);
@@ -373,7 +464,9 @@ export function App() {
             classRegistrations={classRegistrations}
             personalSessions={personalSessions}
             trainers={trainers}
-            rooms={rooms} />);
+            rooms={rooms}
+            onAddSession={handleAddSession}
+            onBookSession={handleBookSession} />);
 
 
       case 'member-profile':
@@ -436,7 +529,8 @@ export function App() {
             trainers={trainers}
             members={members}
             onUpdateSession={handleUpdateSession}
-            onUpdateClass={handleUpdateClass} />);
+            onUpdateClass={handleUpdateClass}
+            onBookSession={handleBookSession} />);
 
 
       case 'admin-equipment':

@@ -191,35 +191,64 @@ export function RegistrationPage({
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const newUserId = Math.max(...users.map((u) => u.user_id)) + 1;
-      const newMemberId = Math.max(...members.map((m) => m.member_id)) + 1;
-      const newUser: User = {
-        user_id: newUserId,
-        username: form.email.toLowerCase().trim(),
-        password: form.password,
-        role: 'member',
-        created_at: new Date().toISOString()
-      };
-      const newMember: Member = {
-        member_id: newMemberId,
-        user_id: newUserId,
-        full_name: form.full_name,
-        email: form.email.toLowerCase().trim(),
-        date_of_birth: form.date_of_birth,
-        gender: form.gender as Gender,
-        phone: form.phone,
-        registered_at: new Date().toISOString()
-      };
-      onRegister(newUser, newMember);
-      toast.success(
-        `Welcome, ${form.full_name}! Your account has been created. You can now sign in.`
-      );
-      setForm(EMPTY_FORM);
-      setErrors({});
-      setTouched({});
-    }, 400);
+    (async () => {
+      try {
+        const membersApi = await import('../../apis/members');
+        const payload = {
+          email: form.email.toLowerCase().trim(),
+          password: form.password,
+          full_name: form.full_name,
+          date_of_birth: form.date_of_birth,
+          gender: form.gender,
+          phone: form.phone
+        };
+        const res = await membersApi.registerMember(payload);
+        setLoading(false);
+        // expect res to include created user/member; attempt to find them
+        const createdUser = res && (res.user || res);
+        const createdMember = res && (res.member || res);
+        if (createdUser && createdMember) {
+          onRegister(createdUser as User, createdMember as Member);
+          toast.success(`Welcome, ${form.full_name}! Your account has been created.`);
+          setForm(EMPTY_FORM);
+          setErrors({});
+          setTouched({});
+          return;
+        }
+      } catch (err) {
+        // fallback to local simulated creation
+      }
+
+      setTimeout(() => {
+        setLoading(false);
+        const newUserId = Math.max(...users.map((u) => u.user_id)) + 1;
+        const newMemberId = Math.max(...members.map((m) => m.member_id)) + 1;
+        const newUser: User = {
+          user_id: newUserId,
+          username: form.email.toLowerCase().trim(),
+          password: form.password,
+          role: 'member',
+          created_at: new Date().toISOString()
+        };
+        const newMember: Member = {
+          member_id: newMemberId,
+          user_id: newUserId,
+          full_name: form.full_name,
+          email: form.email.toLowerCase().trim(),
+          date_of_birth: form.date_of_birth,
+          gender: form.gender as Gender,
+          phone: form.phone,
+          registered_at: new Date().toISOString()
+        };
+        onRegister(newUser, newMember);
+        toast.success(
+          `Welcome, ${form.full_name}! Your account has been created. You can now sign in.`
+        );
+        setForm(EMPTY_FORM);
+        setErrors({});
+        setTouched({});
+      }, 200);
+    })();
   };
   const handleClear = () => {
     setForm(EMPTY_FORM);

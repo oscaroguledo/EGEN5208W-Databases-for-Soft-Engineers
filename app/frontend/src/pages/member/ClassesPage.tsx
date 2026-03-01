@@ -195,17 +195,21 @@ export function ClassesPage({
   const handleEnroll = async (classId: number) => {
     setEnrolling(classId);
     try {
-      // In a real app, this would call the enrollment API
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      // Update local state
-      setClasses(prev => prev.map(cls => 
-        cls.class_id === classId 
-          ? { ...cls, current_enrollment: cls.current_enrollment + 1 }
-          : cls
-      ));
-      
-      alert('Successfully enrolled in class!');
+      // Try calling the members API first
+      try {
+        const membersApi = await import('../../apis/members');
+        await membersApi.enrollInClass(String(classId));
+        setClasses(prev => prev.map(cls => cls.class_id === classId ? { ...cls, current_enrollment: cls.current_enrollment + 1 } : cls));
+        alert('Successfully enrolled in class!');
+        return;
+      } catch (err) {
+        // fallback to simulated
+      }
+
+      // Fallback simulated API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setClasses(prev => prev.map(cls => cls.class_id === classId ? { ...cls, current_enrollment: cls.current_enrollment + 1 } : cls));
+      alert('Successfully enrolled in class! (simulated)');
     } catch (error) {
       console.error('Failed to enroll:', error);
       alert('Failed to enroll in class. Please try again.');

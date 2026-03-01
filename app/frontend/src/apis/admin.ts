@@ -53,3 +53,19 @@ export async function listPayments(skip = 0, limit = 20, member_id?: string, sub
   const res = await api.get('/admin/payments/list', { params });
   return handleAxiosResponse(res);
 }
+
+// Optional equipment CRUD helpers - backend may not expose all endpoints; these are best-effort.
+export async function createEquipment(payload: any) {
+  const res = await api.post('/admin/equipment', payload);
+  return handleAxiosResponse(res);
+}
+
+export async function updateEquipment(equipment_id: string, payload: any) {
+  const res = await api.put(`/admin/equipment/${equipment_id}`, payload);
+  return handleAxiosResponse(res);
+}
+
+export async function deleteEquipment(equipment_id: string) {
+  const res = await api.delete(`/admin/equipment/${equipment_id}`);
+  return handleAxiosResponse(res);
+}

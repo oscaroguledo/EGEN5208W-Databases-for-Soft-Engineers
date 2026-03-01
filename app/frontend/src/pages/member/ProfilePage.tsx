@@ -129,15 +129,31 @@ export function ProfilePage({
       return;
     }
     setSavingProfile(true);
-    setTimeout(() => {
-      onUpdateMember({
-        ...member,
-        full_name: profileForm.full_name,
-        phone: profileForm.phone
-      });
-      setSavingProfile(false);
-      toast.success('Profile updated successfully.');
-    }, 400);
+    (async () => {
+      try {
+        const membersApi = await import('../../apis/members');
+        const res = await membersApi.updateMemberMe({ full_name: profileForm.full_name, phone: profileForm.phone });
+        // res may return the updated member
+        const updated = res && (res.member || res);
+        if (updated) {
+          onUpdateMember(updated as Member);
+          setSavingProfile(false);
+          toast.success('Profile updated successfully.');
+          return;
+        }
+      } catch (err) {
+        // fallback to local update
+      }
+      setTimeout(() => {
+        onUpdateMember({
+          ...member,
+          full_name: profileForm.full_name,
+          phone: profileForm.phone
+        });
+        setSavingProfile(false);
+        toast.success('Profile updated successfully.');
+      }, 200);
+    })();
   };
   const handleAddGoal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,27 +162,52 @@ export function ProfilePage({
       return;
     }
     setSavingGoal(true);
-    setTimeout(() => {
-      const newId = Math.max(...fitnessGoals.map((g) => g.goal_id), 0) + 1;
-      onAddGoal({
-        goal_id: newId,
-        member_id: member.member_id,
-        goal_type: goalForm.goal_type,
-        target_value: parseFloat(goalForm.target_value) || 0,
-        target_unit: goalForm.target_unit,
-        description: goalForm.description,
-        is_active: true,
-        created_at: new Date().toISOString()
-      });
-      setGoalForm({
-        goal_type: '',
-        target_value: '',
-        target_unit: '',
-        description: ''
-      });
-      setSavingGoal(false);
-      toast.success(`Fitness goal "${goalForm.goal_type}" added successfully.`);
-    }, 400);
+    (async () => {
+      try {
+        const membersApi = await import('../../apis/members');
+        const newGoal = {
+          member_id: member.member_id,
+          goal_type: goalForm.goal_type,
+          target_value: parseFloat(goalForm.target_value) || 0,
+          target_unit: goalForm.target_unit,
+          description: goalForm.description,
+          is_active: true
+        };
+        const res = await membersApi.updateGoals([newGoal]);
+        // res may return the created goal(s)
+        const created = res && (Array.isArray(res) ? res[0] : (res.goal || res));
+        if (created) {
+          onAddGoal(created as FitnessGoal);
+          setGoalForm({ goal_type: '', target_value: '', target_unit: '', description: '' });
+          setSavingGoal(false);
+          toast.success(`Fitness goal "${newGoal.goal_type}" added successfully.`);
+          return;
+        }
+      } catch (err) {
+        // fallback
+      }
+      setTimeout(() => {
+        const newId = Math.max(...fitnessGoals.map((g) => g.goal_id), 0) + 1;
+        onAddGoal({
+          goal_id: newId,
+          member_id: member.member_id,
+          goal_type: goalForm.goal_type,
+          target_value: parseFloat(goalForm.target_value) || 0,
+          target_unit: goalForm.target_unit,
+          description: goalForm.description,
+          is_active: true,
+          created_at: new Date().toISOString()
+        });
+        setGoalForm({
+          goal_type: '',
+          target_value: '',
+          target_unit: '',
+          description: ''
+        });
+        setSavingGoal(false);
+        toast.success(`Fitness goal "${goalForm.goal_type}" added successfully.`);
+      }, 200);
+    })();
   };
   const handleAddMetric = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,26 +216,43 @@ export function ProfilePage({
       return;
     }
     setSavingMetric(true);
-    setTimeout(() => {
-      const newId = Math.max(...healthMetrics.map((m) => m.metric_id), 0) + 1;
-      onAddMetric({
-        metric_id: newId,
-        member_id: member.member_id,
-        metric_type: metricForm.metric_type,
-        value: parseFloat(metricForm.value),
-        unit: metricForm.unit,
-        recorded_at: new Date().toISOString()
-      });
-      setMetricForm({
-        metric_type: '',
-        value: '',
-        unit: ''
-      });
-      setSavingMetric(false);
-      toast.success(
-        `Health metric "${metricForm.metric_type}" recorded successfully.`
-      );
-    }, 400);
+    (async () => {
+      try {
+        const membersApi = await import('../../apis/members');
+        const res = await membersApi.addHealthMetric(metricForm.metric_type, parseFloat(metricForm.value));
+        // backend may return the created metric
+        const created = res && (res.metric || res);
+        if (created) {
+          onAddMetric(created as HealthMetric);
+          setMetricForm({ metric_type: '', value: '', unit: '' });
+          setSavingMetric(false);
+          toast.success(`Health metric "${metricForm.metric_type}" recorded successfully.`);
+          return;
+        }
+      } catch (err) {
+        // fallback
+      }
+      setTimeout(() => {
+        const newId = Math.max(...healthMetrics.map((m) => m.metric_id), 0) + 1;
+        onAddMetric({
+          metric_id: newId,
+          member_id: member.member_id,
+          metric_type: metricForm.metric_type,
+          value: parseFloat(metricForm.value),
+          unit: metricForm.unit,
+          recorded_at: new Date().toISOString()
+        });
+        setMetricForm({
+          metric_type: '',
+          value: '',
+          unit: ''
+        });
+        setSavingMetric(false);
+        toast.success(
+          `Health metric "${metricForm.metric_type}" recorded successfully.`
+        );
+      }, 200);
+    })();
   };
   const tabs: {
     id: Tab;

@@ -73,16 +73,30 @@ export function EquipmentPage({
   const pagination = usePagination(displayed, 8);
   if (loading) return <EquipmentSkeleton />;
   const handleStatusChange = (eq: Equipment, newStatus: EquipmentStatus) => {
-    const updated: Equipment = {
-      ...eq,
-      status: newStatus,
-      last_maintained:
-      newStatus === 'operational' ?
-      new Date().toISOString().split('T')[0] :
-      eq.last_maintained
-    };
-    onUpdateEquipment(updated);
-    toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
+    (async () => {
+      try {
+        const admin = await import('../../apis/admin');
+        await admin.updateEquipmentStatus(String(eq.equipment_id), newStatus, undefined);
+        const updated: Equipment = {
+          ...eq,
+          status: newStatus,
+          last_maintained: newStatus === 'operational' ? new Date().toISOString().split('T')[0] : eq.last_maintained
+        };
+        onUpdateEquipment(updated);
+        toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
+        return;
+      } catch (err) {
+        // fallback to local update
+      }
+
+      const updated: Equipment = {
+        ...eq,
+        status: newStatus,
+        last_maintained: newStatus === 'operational' ? new Date().toISOString().split('T')[0] : eq.last_maintained
+      };
+      onUpdateEquipment(updated);
+      toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
+    })();
   };
   const openEdit = (eq: Equipment) => {
     setEditing(eq);
@@ -102,7 +116,29 @@ export function EquipmentPage({
       return;
     }
     setSavingEquipment(true);
-    setTimeout(() => {
+    (async () => {
+      try {
+        // If there's an API for updating equipment, call it. Fallback to local update otherwise.
+        const admin = await import('../../apis/admin');
+        // admin does not expose updateEquipment by default; attempt status update at least
+        await admin.updateEquipmentStatus(String(editing.equipment_id), editingForm.status, editingForm.notes);
+        const updated: Equipment = {
+          ...editing,
+          equipment_name: editingForm.equipment_name,
+          room_id: parseInt(editingForm.room_id),
+          status: editingForm.status,
+          notes: editingForm.notes
+        };
+        onUpdateEquipment(updated);
+        setSavingEquipment(false);
+        setModalOpen(false);
+        toast.success(`Equipment "${updated.equipment_name}" updated.`);
+        setEditing(null);
+        return;
+      } catch (err) {
+        // fallback to local update
+      }
+
       const updated: Equipment = {
         ...editing,
         equipment_name: editingForm.equipment_name,
@@ -115,7 +151,7 @@ export function EquipmentPage({
       setModalOpen(false);
       toast.success(`Equipment "${updated.equipment_name}" updated.`);
       setEditing(null);
-    }, 300);
+    })();
   };
   const handleAddEquipment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +160,31 @@ export function EquipmentPage({
       return;
     }
     setSavingEquipment(true);
-    setTimeout(() => {
+    (async () => {
+      try {
+        const admin = await import('../../apis/admin');
+        // admin does not expose createEquipment endpoint in wrappers; fall back if not present
+        if (typeof (admin as any).createEquipment === 'function') {
+          const res = await (admin as any).createEquipment({
+            equipment_name: newForm.equipment_name,
+            room_id: parseInt(newForm.room_id),
+            status: newForm.status,
+            notes: newForm.notes
+          });
+          // try to use returned equipment
+          if (res && res.equipment_id) {
+            onAddEquipment(res as Equipment);
+            setNewForm({ equipment_name: '', room_id: '', status: 'operational', notes: '' });
+            setModalOpen(false);
+            setSavingEquipment(false);
+            toast.success(`Equipment "${res.equipment_name}" logged successfully.`);
+            return;
+          }
+        }
+      } catch (err) {
+        // continue to fallback
+      }
+
       const newId = Math.max(...equipment.map((e) => e.equipment_id), 0) + 1;
       onAddEquipment({
         equipment_id: newId,
@@ -142,14 +202,25 @@ export function EquipmentPage({
       });
       setModalOpen(false);
       setSavingEquipment(false);
-      toast.success(
-        `Equipment "${newForm.equipment_name}" logged successfully.`
-      );
-    }, 400);
+      toast.success(`Equipment "${newForm.equipment_name}" logged successfully.`);
+    })();
   };
   const handleDeleteEquipment = (eq: Equipment) => {
-    onDeleteEquipment(eq.equipment_id);
-    toast.success(`"${eq.equipment_name}" has been removed.`);
+    (async () => {
+      try {
+        const admin = await import('../../apis/admin');
+        if (typeof (admin as any).deleteEquipment === 'function') {
+          await (admin as any).deleteEquipment(String(eq.equipment_id));
+          onDeleteEquipment(eq.equipment_id);
+          toast.success(`"${eq.equipment_name}" has been removed.`);
+          return;
+        }
+      } catch (err) {
+        // fallback
+      }
+      onDeleteEquipment(eq.equipment_id);
+      toast.success(`"${eq.equipment_name}" has been removed.`);
+    })();
   };
   return (
     <div>

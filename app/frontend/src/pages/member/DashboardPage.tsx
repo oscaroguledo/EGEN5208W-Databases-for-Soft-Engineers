@@ -23,6 +23,8 @@ interface DashboardPageProps {
   personalSessions: PersonalSession[];
   trainers: Trainer[];
   rooms: Room[];
+  onAddSession?: (s: PersonalSession) => void;
+  onBookSession?: (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; notes?: string }) => Promise<any> | void;
 }
 export function DashboardPage({
   currentUser,
@@ -108,6 +110,70 @@ export function DashboardPage({
     a.session_date.localeCompare(b.session_date) ||
     a.start_time.localeCompare(b.start_time)
   );
+  const [bookingOpen, setBookingOpen] = React.useState(false);
+  const [bookingForm, setBookingForm] = React.useState({
+    trainer_id: trainers[0]?.trainer_id ?? -1,
+    room_id: rooms[0]?.room_id ?? -1,
+    session_date: today,
+    start_time: '09:00',
+    end_time: '10:00',
+    notes: ''
+  });
+  const handleBookSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      trainer_id: String(bookingForm.trainer_id),
+      room_id: String(bookingForm.room_id),
+      session_date: bookingForm.session_date,
+      start_time: bookingForm.start_time,
+      end_time: bookingForm.end_time,
+      notes: bookingForm.notes
+    };
+    // Prefer app-level booking handler when provided
+    if (typeof onBookSession === 'function') {
+      try {
+        const created = await onBookSession(payload);
+        if (created) {
+          toast.success('Session booked successfully.');
+          setBookingOpen(false);
+          return;
+        }
+      } catch (err) {
+        // continue to fallback
+      }
+    }
+    // Fallback: try members API directly
+    try {
+      const membersApi = await import('../../apis/members');
+      const res = await membersApi.bookSession(payload);
+      const created = res && (res.session || res);
+      if (created && onAddSession) {
+        onAddSession(created as PersonalSession);
+        toast.success('Session booked successfully.');
+        setBookingOpen(false);
+        return;
+      }
+    } catch (err) {
+      // fallback to local creation
+    }
+    if (onAddSession) {
+      const newId = Math.max(...personalSessions.map((s) => s.session_id), 0) + 1;
+      const created: PersonalSession = {
+        session_id: newId,
+        member_id: mid,
+        trainer_id: bookingForm.trainer_id,
+        room_id: bookingForm.room_id,
+        session_date: bookingForm.session_date,
+        start_time: bookingForm.start_time,
+        end_time: bookingForm.end_time,
+        status: 'scheduled',
+        notes: bookingForm.notes
+      };
+      onAddSession(created);
+      toast.success('Session booked (local).');
+      setBookingOpen(false);
+    }
+  };
   const metricColors = [
   'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300',
   'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300',
@@ -317,7 +383,45 @@ export function DashboardPage({
                 <p className="text-sm text-slate-400 dark:text-slate-500">
                   No upcoming sessions.
                 </p>
-              </div> :
+                      <div className="mt-4">
+                        <button
+                          className="text-sm text-teal-600 hover:underline"
+                          onClick={() => setBookingOpen((s) => !s)}>
+                          {bookingOpen ? 'Cancel' : 'Book a Session'}
+                        </button>
+                        {bookingOpen && (
+                          <form onSubmit={handleBookSession} className="mt-3 space-y-2 max-w-md mx-auto text-left">
+                            <div>
+                              <label className="text-xs text-slate-500">Trainer</label>
+                              <select className="w-full mt-1 p-2 border rounded" value={String(bookingForm.trainer_id)} onChange={(e) => setBookingForm((f) => ({ ...f, trainer_id: parseInt(e.target.value) }))}>
+                                {trainers.map((t) => (
+                                  <option key={t.trainer_id} value={t.trainer_id}>{t.full_name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500">Room</label>
+                              <select className="w-full mt-1 p-2 border rounded" value={String(bookingForm.room_id)} onChange={(e) => setBookingForm((f) => ({ ...f, room_id: parseInt(e.target.value) }))}>
+                                {rooms.map((r) => (
+                                  <option key={r.room_id} value={r.room_id}>{r.room_name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <input type="date" className="p-2 border rounded col-span-1" value={bookingForm.session_date} onChange={(e) => setBookingForm((f) => ({ ...f, session_date: e.target.value }))} />
+                              <input type="time" className="p-2 border rounded" value={bookingForm.start_time} onChange={(e) => setBookingForm((f) => ({ ...f, start_time: e.target.value }))} />
+                              <input type="time" className="p-2 border rounded" value={bookingForm.end_time} onChange={(e) => setBookingForm((f) => ({ ...f, end_time: e.target.value }))} />
+                            </div>
+                            <div>
+                              <input placeholder="Notes (optional)" className="w-full p-2 border rounded" value={bookingForm.notes} onChange={(e) => setBookingForm((f) => ({ ...f, notes: e.target.value }))} />
+                            </div>
+                            <div className="text-right">
+                              <button type="submit" className="px-3 py-2 bg-teal-600 text-white rounded">Confirm Booking</button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+                    </div> :
 
             <div className="space-y-3">
                 {upcomingSessions.map((s) => {
