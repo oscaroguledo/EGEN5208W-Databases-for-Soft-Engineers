@@ -23,6 +23,7 @@ type Page =
 'member-dashboard' |
 'member-profile' |
 'member-health' |
+'member-classes' |
 'trainer-availability' |
 'trainer-schedule' |
 'admin-rooms' |
@@ -47,6 +48,11 @@ const memberNav: NavItem[] = [
   page: 'member-dashboard',
   label: 'Dashboard',
   icon: <LayoutDashboardIcon className="w-4 h-4" />
+},
+{
+  page: 'member-classes',
+  label: 'Classes',
+  icon: <DumbbellIcon className="w-4 h-4" />
 },
 {
   page: 'member-health',

@@ -58,6 +58,11 @@ import('./pages/member/HealthHistoryPage').then((m) => ({
   default: m.HealthHistoryPage
 }))
 );
+const ClassesPage = lazy(() =>
+import('./pages/member/ClassesPage').then((m) => ({
+  default: m.ClassesPage
+}))
+);
 const AvailabilityPage = lazy(() =>
 import('./pages/trainer/AvailabilityPage').then((m) => ({
   default: m.AvailabilityPage
@@ -95,6 +100,7 @@ export type Page =
 'member-dashboard' |
 'member-profile' |
 'member-health' |
+'member-classes' |
 'trainer-availability' |
 'trainer-schedule' |
 'admin-rooms' |
@@ -107,8 +113,9 @@ const PAGE_ROLES: Record<Page, string[]> = {
   'member-dashboard': ['member'],
   'member-profile': ['member'],
   'member-health': ['member'],
-  'trainer-schedule': ['trainer'],
+  'member-classes': ['member'],
   'trainer-availability': ['trainer'],
+  'trainer-schedule': ['trainer'],
   'admin-rooms': ['admin'],
   'admin-equipment': ['admin'],
   'not-found': [],
@@ -387,6 +394,15 @@ export function App() {
             currentUser={currentUser}
             members={members}
             healthMetrics={healthMetrics} />);
+
+      case 'member-classes':
+        return (
+          <ClassesPage
+            currentUser={currentUser}
+            members={members}
+            classes={groupClasses}
+            trainers={trainers}
+            rooms={rooms} />);
 
 
       case 'trainer-schedule':
