@@ -16,7 +16,15 @@ export function Pagination({
   pageSize,
   className = ''
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  // Remove the early return to always show pagination for better UX
+  // if (totalPages <= 1) return null;
+  
+  console.log('Pagination component rendering:', {
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize
+  });
   const getPageNumbers = (): (number | '...')[] => {
     const pages: (number | '...')[] = [];
     if (totalPages <= 7) {
@@ -38,6 +46,11 @@ export function Pagination({
   return (
     <div
       className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-1 ${className}`}>
+
+      {/* Debug indicator */}
+      <div className="bg-blue-500 text-white px-2 py-1 text-xs">
+        Pagination: Page {currentPage} of {totalPages} (Items: {totalItems})
+      </div>
 
       {/* Count info */}
       {totalItems != null && from != null && to != null ?
