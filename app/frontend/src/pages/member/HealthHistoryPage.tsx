@@ -17,6 +17,12 @@ export function HealthHistoryPage({
   members,
   healthMetrics
 }: HealthHistoryPageProps) {
+  console.log('HealthHistoryPage component rendering!', {
+    currentUser,
+    members: members.length,
+    healthMetrics: healthMetrics.length
+  });
+  
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
   
@@ -102,6 +108,11 @@ export function HealthHistoryPage({
 
   return (
     <div>
+      {/* Debug test - this should always be visible */}
+      <div className="bg-red-500 text-white p-2 mb-4">
+        HealthHistoryPage is rendering! Loading: {loading ? 'YES' : 'NO'}
+      </div>
+      
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           Health History
