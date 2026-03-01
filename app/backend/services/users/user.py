@@ -99,3 +99,23 @@ class UserService:
         if not user:
             return False
         return await PasswordManager.verify_password(password, user.password)
+
+    @staticmethod
+    async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
+        """
+        Authenticate user by email and password
+        """
+        from sqlalchemy.future import select
+        
+        # Find user by email
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return None
+        
+        # Verify password
+        if not await PasswordManager.verify_password(password, user.password):
+            return None
+            
+        return user

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.db import engine, Base
 from core.config import settings
 
-from routes import members, trainers, admin
+from routes import members, trainers, admin, auth
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(members.router)
 app.include_router(trainers.router)
 app.include_router(admin.router)
