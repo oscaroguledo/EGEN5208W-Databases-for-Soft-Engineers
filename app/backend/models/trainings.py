@@ -1,4 +1,4 @@
-from sqlalchemy import Column, UUID, String, Integer, Date, Time, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, UUID, String, Integer, Date, Time, DateTime, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -45,6 +45,7 @@ class Class(Base):
     class_date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+    max_capacity = Column(Integer, nullable=False, default=20)
     created_at = Column(DateTime, default=datetime.utcnow)
     deleted_at = Column(DateTime, nullable=True)
 
@@ -53,7 +54,7 @@ class Class(Base):
     enrollments = relationship("Enrollment", back_populates="class_")
 
     def __repr__(self):
-        return f"<Class(id='{self.id}', name='{self.name}', trainer_id='{self.trainer_id}', room_id='{self.room_id}', class_date='{self.class_date}', start_time='{self.start_time}', end_time='{self.end_time}', created_at='{self.created_at}', deleted_at='{self.deleted_at}')>"
+        return f"<Class(id='{self.id}', name='{self.name}', trainer_id='{self.trainer_id}', room_id='{self.room_id}', class_date='{self.class_date}', start_time='{self.start_time}', end_time='{self.end_time}', max_capacity='{self.max_capacity}', created_at='{self.created_at}', deleted_at='{self.deleted_at}')>"
 
     def to_dict(self):
         return {
@@ -64,6 +65,7 @@ class Class(Base):
             "class_date": self.class_date.isoformat() if self.class_date else None,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
+            "max_capacity": self.max_capacity,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
         }
@@ -75,6 +77,11 @@ class Enrollment(Base):
     member_id = Column(UUID(as_uuid=True), ForeignKey("members.id"), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
     registered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Prevent duplicate enrollments
+    __table_args__ = (
+        UniqueConstraint('member_id', 'class_id', name='uq_member_class_enrollment'),
+    )
 
     member = relationship("Member", back_populates="enrollments")
     class_ = relationship("Class", back_populates="enrollments")

@@ -1,11 +1,13 @@
+
+
 from core.db import Base
-from sqlalchemy import Column, UUID, ForeignKey
+from sqlalchemy import Column, UUID, ForeignKey, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import DateTime
 from datetime import datetime
 
-class Trainer(Base):
-    __tablename__ = "trainers"
+class AdminStaff(Base):
+    __tablename__ = "admin_staff"
 
     id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     full_name = Column(String, nullable=False)
@@ -13,13 +15,10 @@ class Trainer(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = Column(DateTime, nullable=True)
 
-    user = relationship("User", back_populates="trainer")
-    classes = relationship("Class", back_populates="trainer")
-    availability = relationship("TrainerAvailability", back_populates="trainer")
-    training_sessions = relationship("TrainingSession", back_populates="trainer")
+    user = relationship("User", back_populates="admin_staff")
     
     def __repr__(self):
-        return f"<Trainer(id='{self.id}', full_name='{self.full_name}')>"
+        return f"<AdminStaff(id='{self.id}', full_name='{self.full_name}')>"
     
     def to_dict(self):
         return {

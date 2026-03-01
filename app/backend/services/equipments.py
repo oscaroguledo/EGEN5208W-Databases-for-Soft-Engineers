@@ -5,7 +5,7 @@ from sqlalchemy import update, delete
 from uuid import UUID
 from datetime import datetime
 
-from models.equipment import Equipment, EquipmentStatus
+from models.equipments import Equipment, EquipmentStatus
 
 class EquipmentService:
     """

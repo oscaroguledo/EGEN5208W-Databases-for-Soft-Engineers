@@ -5,7 +5,7 @@ from sqlalchemy import update, delete
 from uuid import UUID
 from datetime import datetime
 
-from models.fitness import FitnessGoal, HealthMetric
+from models.goals import FitnessGoal, HealthMetric
 
 
 class FitnessGoalService:

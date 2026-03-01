@@ -5,7 +5,7 @@ from sqlalchemy import update, delete
 from uuid import UUID
 from datetime import datetime
 
-from models.fitness import Room, Class, Enrollment, TrainerAvailability, TrainingSession, SessionStatus
+from models.trainings import Room, Class, Enrollment, TrainerAvailability, TrainingSession, SessionStatus
 
 
 class RoomService:

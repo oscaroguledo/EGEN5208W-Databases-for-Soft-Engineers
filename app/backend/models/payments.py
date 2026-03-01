@@ -19,6 +19,7 @@ class Payment(Base):
     subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=False)
     amount = Column(DECIMAL(10,2), nullable=False)
     paid_at = Column(DateTime, nullable=False)
+    payment_method = Column(String(100), nullable=False)  # e.g., "credit card", "cash", "bank transfer"
     deleted_at = Column(DateTime, nullable=True)
     status = Column(Enum(PaymentStatus), nullable=False, default=PaymentStatus.pending)
 
@@ -26,7 +27,7 @@ class Payment(Base):
     subscription = relationship("Subscription", back_populates="payments")
     
     def __repr__(self):
-        return f"<Payment(id='{self.id}', member_id='{self.member_id}', subscription_id='{self.subscription_id}', amount='{self.amount}', paid_at='{self.paid_at}', deleted_at='{self.deleted_at}', status='{self.status}')>"
+        return f"<Payment(id='{self.id}', member_id='{self.member_id}', subscription_id='{self.subscription_id}', amount='{self.amount}', paid_at='{self.paid_at}', payment_method='{self.payment_method}', deleted_at='{self.deleted_at}', status='{self.status}')>"
     
     def to_dict(self):
         return {
@@ -35,6 +36,7 @@ class Payment(Base):
             "subscription_id": str(self.subscription_id),
             "amount": float(self.amount),
             "paid_at": self.paid_at.isoformat() if self.paid_at else None,
+            "payment_method": self.payment_method,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
             "status": self.status.value,
         }
