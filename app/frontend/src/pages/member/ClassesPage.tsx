@@ -25,6 +25,9 @@ export function ClassesPage({
   const [classes, setClasses] = useState<GroupClass[]>([]);
   const [enrolling, setEnrolling] = useState<number | null>(null);
   
+  // Call pagination hook unconditionally to preserve hooks order
+  const pagination = usePagination(classes, 6); // Show 6 classes per page
+  
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -233,9 +236,6 @@ export function ClassesPage({
   };
 
   if (loading) return <DashboardSkeleton />;
-
-  // Add pagination for classes
-  const pagination = usePagination(classes, 6); // Show 6 classes per page
 
   return (
     <div>
