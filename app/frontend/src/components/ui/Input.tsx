@@ -33,6 +33,7 @@ export function Input({
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
   
   const togglePasswordVisibility = () => {
+    console.log('Toggle password clicked, current state:', showPassword);
     setShowPassword(!showPassword);
   };
 
@@ -70,12 +71,16 @@ export function Input({
         {showPasswordToggle && props.type === 'password' && (
           <button
             type="button"
-            onClick={togglePasswordVisibility}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none bg-transparent z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              togglePasswordVisibility();
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none bg-transparent z-10 p-1 rounded cursor-pointer"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            tabIndex={-1}
+            tabIndex={0}
             style={{
-              right: '0.75rem' // Override any conflicting styles
+              right: '0.75rem'
             }}
           >
             {showPassword ? (
