@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 
 from core.db import get_db
-from core.auth import require_member, PermissionChecker
+from core.auth import require_member, require_admin, PermissionChecker
 from core.response import APIResponse, Pagination
 from models.users.user import User, UserRole
 from schemas.users import MemberResponse, MemberCreate, MemberProfileUpdate
