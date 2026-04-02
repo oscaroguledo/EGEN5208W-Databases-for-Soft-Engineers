@@ -163,14 +163,14 @@ export function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [rooms] = useState<Room[]>([]);
-  const [fitnessGoals] = useState<FitnessGoal[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [fitnessGoals, setFitnessGoals] = useState<FitnessGoal[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const [trainerAvailability, setTrainerAvailability] = useState<TrainerAvailability[]>([]);
   const [groupClasses, setGroupClasses] = useState<GroupClass[]>([]);
   const [classRegistrations] = useState<ClassRegistration[]>([]);
   const [personalSessions, setPersonalSessions] = useState<PersonalSession[]>([]);
-  const [equipment] = useState<Equipment[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   // ─── API hydration: replace local fixtures with backend data when available
   useEffect(() => {
     let mounted = true;

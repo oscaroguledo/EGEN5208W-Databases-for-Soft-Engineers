@@ -223,45 +223,46 @@ export function RegistrationPage({
     setTouched({});
   };
   // ─── Live requirement checks ──────────────────────────────────────────────
-  const emailValid = isValidEmail(form.email);
-  const emailTaken =
-  members.some(
-    (m) => m.email.toLowerCase() === form.email.toLowerCase().trim()
-  ) ||
-  users.some(
-    (u) => u.username.toLowerCase() === form.email.toLowerCase().trim()
-  );
-  const passwordLong = form.password.length >= 6;
-  const passwordsMatch =
-  form.password.length > 0 && form.confirm_password === form.password;
-  const requiredFilled =
-  form.email.trim() !== '' &&
-  form.password !== '' &&
-  form.confirm_password !== '' &&
-  form.full_name.trim() !== '' &&
-  form.date_of_birth !== '' &&
-  form.gender !== '';
-  const requirements = [
-  {
-    label: 'Email must be unique and valid',
-    met: emailValid && !emailTaken,
-    active: form.email.length > 0
-  },
-  {
-    label: 'Password minimum 6 characters',
-    met: passwordLong,
-    active: form.password.length > 0
-  },
-  {
-    label: 'Passwords must match',
-    met: passwordsMatch,
-    active: form.confirm_password.length > 0
-  },
-  {
-    label: 'All required fields must be filled',
-    met: requiredFilled,
-    active: Object.values(form).some((v) => v !== '')
-  }];
+  // const emailValid = isValidEmail(form.email);
+  // const emailTaken =
+  // members.some(
+  //   (m) => m.email.toLowerCase() === form.email.toLowerCase().trim()
+  // ) ||
+  // users.some(
+  //   (u) => u.username.toLowerCase() === form.email.toLowerCase().trim()
+  // );
+  // const passwordLong = form.password.length >= 6;
+  // const passwordsMatch =
+  // form.password.length > 0 && form.confirm_password === form.password;
+  // const requiredFilled =
+  // form.email.trim() !== '' &&
+  // form.password !== '' &&
+  // form.confirm_password !== '' &&
+  // form.full_name.trim() !== '' &&
+  // form.date_of_birth !== '' &&
+  // form.gender !== '';
+  // TODO: Use requirements array for validation UI
+  // const requirements = [
+  // {
+  //   label: 'Email must be unique and valid',
+  //   met: emailValid && !emailTaken,
+  //   active: form.email.length > 0
+  // },
+  // {
+  //   label: 'Password minimum 6 characters',
+  //   met: passwordLong,
+  //   active: form.password.length > 0
+  // },
+  // {
+  //   label: 'Passwords must match',
+  //   met: passwordsMatch,
+  //   active: form.confirm_password.length > 0
+  // },
+  // {
+  //   label: 'All required fields must be filled',
+  //   met: requiredFilled,
+  //   active: Object.values(form).some((v) => v !== '')
+  // }];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">

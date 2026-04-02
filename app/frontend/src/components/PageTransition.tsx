@@ -1,4 +1,4 @@
-import React, { Children } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 interface PageTransitionProps {
   children: React.ReactNode;
