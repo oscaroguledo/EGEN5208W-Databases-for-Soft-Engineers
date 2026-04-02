@@ -7,13 +7,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/package.json:/app/package.json
-      - ./frontend/tailwind.config.js:/app/tailwind.config.js
-      - ./frontend/vite.config.ts:/app/vite.config.ts
-      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/:/app/
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
