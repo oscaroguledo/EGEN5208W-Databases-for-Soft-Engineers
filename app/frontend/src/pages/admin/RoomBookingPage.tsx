@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { DoorOpenIcon } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Badge } from '@/components/ui/Badge';
 import { RoomBookingSkeleton } from '@/components/ui/Skeleton';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { toast } from 'sonner';
 import {
   Room,
@@ -45,13 +46,41 @@ export function RoomBookingPage({
   const [targetType, setTargetType] = useState<'session' | 'class'>('session');
   const [targetId, setTargetId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 450);
-    return () => clearTimeout(t);
-  }, []);
-  // top-level filtered rooms and pagination must be initialized before any early returns
-  const filteredRooms = rooms.filter((r) => r.room_name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const roomsPagination = usePagination(filteredRooms, 6);
+  
+  // Simulate loading
+  setTimeout(() => setLoading(false), 450);
+  
+  // Server-side pagination for rooms
+  const fetchRooms = useCallback(async (skip: number, limit: number) => {
+    // Filter rooms based on search query
+    const filtered = rooms.filter((r) => 
+      r.room_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    // Simulate server-side pagination
+    const page = Math.floor(skip / limit) + 1;
+    const paginatedData = filtered.slice(skip, skip + limit);
+    return {
+      status: 'success',
+      message: 'Rooms retrieved successfully',
+      status_code: 200,
+      data: paginatedData,
+      pagination: {
+        total: filtered.length,
+        page,
+        size: limit,
+        total_pages: Math.ceil(filtered.length / limit)
+      }
+    };
+  }, [rooms, searchQuery]);
+
+  const {
+    data: roomsData,
+    currentPage: roomsCurrentPage,
+    totalPages: roomsTotalPages,
+    totalItems: roomsTotalItems,
+    setPage: setRoomsPage,
+  } = usePagination<Room>(fetchRooms, { pageSize: 6 });
 
   if (loading) return <RoomBookingSkeleton />;
   const getRoomBookings = (roomId: number) => ({
@@ -66,12 +95,10 @@ export function RoomBookingPage({
   // Component to render paginated bookings for a room
   function RoomBookingsList({
     sessions,
-    classes,
-    pageSize = 5
+    classes
   }: {
     sessions: PersonalSession[];
     classes: GroupClass[];
-    pageSize?: number;
   }) {
     type Booking = { kind: 'session'; data: PersonalSession } | { kind: 'class'; data: GroupClass };
 
@@ -238,7 +265,7 @@ export function RoomBookingPage({
       if (created) {
         onUpdateSession(created as PersonalSession);
         toast.success('Session booked successfully');
-        setBookForm({ trainer_id: '', room_id: '', session_date: '', start_time: '', end_time: '', notes: '' });
+        setCreateForm({ trainer_id: trainers[0]?.trainer_id ?? -1, member_id: members[0]?.member_id ?? -1, room_id: rooms[0]?.room_id ?? -1, session_date: new Date().toISOString().split('T')[0], start_time: '09:00', end_time: '10:00', notes: '' });
       } else {
         toast.error('Failed to book session');
       }
@@ -455,7 +482,7 @@ export function RoomBookingPage({
               />
             </div>
             <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {roomsPagination.paginated.map((room) => {
+              {roomsData.map((room) => {
                 const { sessions, classes } = getRoomBookings(room.room_id);
                 const totalBookings = sessions.length + classes.length;
                 return (
@@ -493,7 +520,7 @@ export function RoomBookingPage({
                       <div className="text-xs text-slate-400 dark:text-slate-500 ml-14">No bookings</div>
                     ) : (
                       <div className="ml-14">
-                        <RoomBookingsList sessions={sessions} classes={classes} pageSize={4} />
+                        <RoomBookingsList sessions={sessions} classes={classes} />
                       </div>
                     )}
                   </div>);
@@ -502,11 +529,11 @@ export function RoomBookingPage({
             </div>
             <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
               <Pagination
-                currentPage={roomsPagination.currentPage}
-                totalPages={roomsPagination.totalPages}
-                onPageChange={roomsPagination.setCurrentPage}
-                totalItems={roomsPagination.totalItems}
-                pageSize={roomsPagination.pageSize}
+                currentPage={roomsCurrentPage}
+                totalPages={roomsTotalPages}
+                onPageChange={setRoomsPage}
+                totalItems={roomsTotalItems}
+                pageSize={6}
               />
             </div>
           </Card>

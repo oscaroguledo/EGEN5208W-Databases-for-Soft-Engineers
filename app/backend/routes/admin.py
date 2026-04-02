@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
+from datetime import datetime
 
 from core.db import get_db
 from core.auth import require_admin
@@ -130,30 +131,6 @@ async def get_all_equipment(
         ),
         status_code=200
     )
-    from models.equipments import Equipment, EquipmentStatus
-    from sqlalchemy.future import select
-    
-    query = select(Equipment).where(Equipment.deleted_at.is_(None))
-    
-    if status_filter:
-        try:
-            status_enum = EquipmentStatus(status_filter)
-            query = query.where(Equipment.status == status_enum)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid equipment status"
-            )
-    
-    result = await db.execute(query)
-    equipment_list = result.scalars().all()
-    
-    return APIResponse(
-        status="success",
-        message="Equipment list retrieved",
-        data=equipment_list,
-        status_code=200
-    )
 
 @router.get("/equipment/list", response_model=APIResponse[List])
 async def list_equipment_paginated(
@@ -223,6 +200,151 @@ async def update_equipment_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid equipment status"
         )
+
+@router.get("/equipment/status-options", response_model=APIResponse[List[dict]])
+async def get_equipment_status_options(
+    current_user: User = Depends(require_admin)
+):
+    """Get available equipment status options"""
+    from models.equipments import EquipmentStatus
+    
+    status_options = [
+        {"value": EquipmentStatus.operational.value, "label": "Operational"},
+        {"value": EquipmentStatus.under_repair.value, "label": "Under Repair"},
+        {"value": EquipmentStatus.out_of_service.value, "label": "Out of Service"}
+    ]
+    
+    return APIResponse(
+        status="success",
+        message="Equipment status options retrieved",
+        data=status_options,
+        status_code=200
+    )
+
+@router.post("/equipment", response_model=APIResponse[dict])
+async def create_equipment(
+    equipment_name: str,
+    room_id: UUID,
+    status: str = "operational",
+    notes: str = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create new equipment"""
+    from models.equipments import EquipmentStatus
+    from services.equipments import EquipmentService
+    
+    try:
+        status_enum = EquipmentStatus(status)
+        new_equipment = await EquipmentService.create_equipment(
+            db=db,
+            room_id=room_id,
+            equipment_name=equipment_name,
+            status=status_enum
+        )
+        
+        # Update notes if provided
+        if notes:
+            await EquipmentService.update_equipment(
+                db=db,
+                equipment_id=new_equipment.id,
+                maintenance_notes=notes
+            )
+        
+        return APIResponse(
+            status="success",
+            message="Equipment created successfully",
+            data={
+                "equipment_id": str(new_equipment.id),
+                "equipment_name": new_equipment.equipment_name
+            },
+            status_code=201
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.put("/equipment/{equipment_id}", response_model=APIResponse[dict])
+async def update_equipment(
+    equipment_id: UUID,
+    equipment_name: str = None,
+    room_id: UUID = None,
+    status: str = None,
+    notes: str = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update equipment details"""
+    from models.equipments import EquipmentStatus
+    from services.equipments import EquipmentService
+    
+    try:
+        # Build update data dict
+        update_data = {}
+        if equipment_name:
+            update_data["equipment_name"] = equipment_name
+        if room_id:
+            update_data["room_id"] = room_id
+        if status:
+            status_enum = EquipmentStatus(status)
+            update_data["status"] = status_enum
+        if notes is not None:
+            update_data["maintenance_notes"] = notes
+        if update_data:
+            update_data["updated_at"] = datetime.utcnow()
+        
+        equipment = await EquipmentService.update_equipment(
+            db=db,
+            equipment_id=equipment_id,
+            **update_data
+        )
+        
+        if not equipment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Equipment not found"
+            )
+        
+        return APIResponse(
+            status="success",
+            message="Equipment updated successfully",
+            data={"equipment_id": str(equipment.id)},
+            status_code=200
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.delete("/equipment/{equipment_id}", response_model=APIResponse[dict])
+async def delete_equipment(
+    equipment_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete equipment (soft delete)"""
+    from services.equipments import EquipmentService
+    
+    success = await EquipmentService.soft_delete_equipment(
+        db=db,
+        equipment_id=equipment_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Equipment not found"
+        )
+    
+    return APIResponse(
+        status="success",
+        message="Equipment deleted successfully",
+        data={"equipment_id": str(equipment_id)},
+        status_code=200
+    )
 
 @router.get("/sessions/list", response_model=APIResponse[List])
 async def list_training_sessions(

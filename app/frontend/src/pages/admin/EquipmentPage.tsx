@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { WrenchIcon, PlusIcon, PencilIcon, Trash2Icon, FilterIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -18,35 +18,68 @@ interface EquipmentPageProps {
   rooms: Room[];
 }
 
-const STATUS_OPTIONS = [
-  { value: 'operational', label: 'Operational' },
-  { value: 'under repair', label: 'Under Repair' },
-  { value: 'out of service', label: 'Out of Service' }
-];
+interface StatusOption {
+  value: string;
+  label: string;
+}
 
 const PAGE_SIZE = 8;
 
 export function EquipmentPage({ rooms }: EquipmentPageProps) {
   const [filter, setFilter] = useState<'all' | 'needs-attention'>('all');
   const [modalOpen, setModalOpen] = useState(false);
+  const [statusOptions, setStatusOptions] = useState<StatusOption[]>([]);
+  const [statusOptionsLoading, setStatusOptionsLoading] = useState(true);
   const [newForm, setNewForm] = useState({
     equipment_name: '',
     room_id: '',
     status: 'operational' as EquipmentStatus,
-    notes: ''
+    maintenance_notes: ''
   });
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [editingForm, setEditingForm] = useState({
     equipment_name: '',
     room_id: '',
     status: 'operational' as EquipmentStatus,
-    notes: ''
+    maintenance_notes: ''
   });
 
   // Server-side pagination
   const fetchEquipment = useCallback(async (skip: number, limit: number) => {
     const res = await adminApi.listEquipmentPaginated(skip, limit);
     return res;
+  }, []);
+
+  // Fetch equipment status options from backend
+  useEffect(() => {
+    const fetchStatusOptions = async () => {
+      try {
+        setStatusOptionsLoading(true);
+        const res = await adminApi.getEquipmentStatusOptions();
+        if (res.data && Array.isArray(res.data)) {
+          setStatusOptions(res.data);
+        } else {
+          // Fallback to default options if backend doesn't provide them
+          setStatusOptions([
+            { value: 'operational', label: 'Operational' },
+            { value: 'under repair', label: 'Under Repair' },
+            { value: 'out of service', label: 'Out of Service' }
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch equipment status options:', error);
+        // Fallback to default options on error
+        setStatusOptions([
+          { value: 'operational', label: 'Operational' },
+          { value: 'under repair', label: 'Under Repair' },
+          { value: 'out of service', label: 'Out of Service' }
+        ]);
+      } finally {
+        setStatusOptionsLoading(false);
+      }
+    };
+
+    fetchStatusOptions();
   }, []);
 
   const {
@@ -90,7 +123,7 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
       equipment_name: eq.equipment_name,
       room_id: String(eq.room_id),
       status: eq.status,
-      notes: eq.notes || ''
+      maintenance_notes: eq.maintenance_notes || ''
     });
     setModalOpen(true);
   };
@@ -103,7 +136,7 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
       return;
     }
     try {
-      await adminApi.updateEquipmentStatus(String(editing.equipment_id), editingForm.status, editingForm.notes);
+      await adminApi.updateEquipmentStatus(String(editing.equipment_id), editingForm.status, editingForm.maintenance_notes);
       toast.success(`Equipment "${editingForm.equipment_name}" updated.`);
       setModalOpen(false);
       setEditing(null);
@@ -124,11 +157,11 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
         equipment_name: newForm.equipment_name,
         room_id: parseInt(newForm.room_id),
         status: newForm.status,
-        notes: newForm.notes
+        maintenance_notes: newForm.maintenance_notes
       });
       if (res && res.equipment_id) {
         toast.success(`Equipment "${res.equipment_name}" created successfully.`);
-        setNewForm({ equipment_name: '', room_id: '', status: 'operational', notes: '' });
+        setNewForm({ equipment_name: '', room_id: '', status: 'operational', maintenance_notes: '' });
         setModalOpen(false);
         refresh();
       } else {
@@ -256,8 +289,8 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
                       <StatusBadge status={eq.status} />
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Last: {eq.last_maintained || '—'}</div>
-                  {eq.notes && <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{eq.notes}</div>}
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Created: {new Date(eq.created_at).toLocaleDateString()}</div>
+                  {eq.maintenance_notes && <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{eq.maintenance_notes}</div>}
                   <div className="mt-3 flex items-center gap-2">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(eq)} title="Edit">
                       <PencilIcon className="w-4 h-4" />
@@ -269,8 +302,10 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
                       <Dropdown
                         value={eq.status}
                         onChange={(v) => handleStatusChange(eq, v as EquipmentStatus)}
-                        options={STATUS_OPTIONS}
+                        options={statusOptions}
                         className="w-36"
+                        disabled={statusOptionsLoading}
+                        placeholder={statusOptionsLoading ? 'Loading...' : 'Select status'}
                       />
                     </div>
                   </div>
@@ -347,18 +382,20 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
                       <StatusBadge status={eq.status} />
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-slate-500 dark:text-slate-400 hidden md:table-cell">
-                      {eq.last_maintained || '—'}
+                      {new Date(eq.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-xs text-slate-500 dark:text-slate-400 max-w-xs truncate hidden lg:table-cell">
-                      {eq.notes || '—'}
+                      {eq.maintenance_notes || '—'}
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Dropdown
                           value={eq.status}
                           onChange={(v) => handleStatusChange(eq, v as EquipmentStatus)}
-                          options={STATUS_OPTIONS}
+                          options={statusOptions}
                           className="w-36"
+                          disabled={statusOptionsLoading}
+                          placeholder={statusOptionsLoading ? 'Loading...' : 'Select status'}
                         />
                         <Button size="sm" variant="ghost" onClick={() => openEdit(eq)} title="Edit">
                           <PencilIcon className="w-3.5 h-3.5 text-slate-500" />
@@ -441,14 +478,17 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
             onChange={(v) =>
               editing ? setEditingForm((f) => ({ ...f, status: v as EquipmentStatus })) : setNewForm((f) => ({ ...f, status: v as EquipmentStatus }))
             }
-            options={STATUS_OPTIONS} />
+            options={statusOptions}
+            disabled={statusOptionsLoading}
+            placeholder={statusOptionsLoading ? 'Loading status options...' : 'Select status'}
+          />
 
           <Textarea
             label="Notes"
             placeholder="Describe the issue or equipment details..."
-            value={editing ? editingForm.notes : newForm.notes}
+            value={editing ? editingForm.maintenance_notes : newForm.maintenance_notes}
             onChange={(e) =>
-              editing ? setEditingForm((f) => ({ ...f, notes: e.target.value })) : setNewForm((f) => ({ ...f, notes: e.target.value }))
+              editing ? setEditingForm((f) => ({ ...f, maintenance_notes: e.target.value })) : setNewForm((f) => ({ ...f, maintenance_notes: e.target.value }))
             } />
 
         </form>

@@ -44,6 +44,11 @@ export async function bookSession(payload: { trainer_id: string; room_id: string
   return handleAxiosResponse(res);
 }
 
+export async function cancelSession(session_id: string) {
+  const res = await api.delete(`/members/book-session/${session_id}`);
+  return handleAxiosResponse(res);
+}
+
 export async function listAvailableClasses(skip = 0, limit = 100, class_date?: string) {
   const params: any = { skip, limit };
   if (class_date) params.class_date = class_date;

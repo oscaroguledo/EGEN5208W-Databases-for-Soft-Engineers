@@ -1,64 +1,52 @@
-import React, { useEffect, useState } from 'react';
-import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon, SearchIcon } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
-import { User, Member, GroupClass, Trainer, Room } from '@/data/types';
+import { GroupClass, Trainer, Room } from '@/data/types';
 import { listAvailableClasses, enrollInClass } from '@/apis/members';
 
 interface ClassesPageProps {
-  currentUser: User;
-  members: Member[];
-  classes: GroupClass[];
   trainers: Trainer[];
   rooms: Room[];
 }
 
+const PAGE_SIZE = 6;
+
 export function ClassesPage({
-  currentUser,
-  members,
   trainers,
   rooms
 }: ClassesPageProps) {
-  const [loading, setLoading] = useState(true);
-  const [classes, setClasses] = useState<GroupClass[]>([]);
   const [enrolling, setEnrolling] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Call pagination hook unconditionally to preserve hooks order
-  const pagination = usePagination(classes, 6); // Show 6 classes per page
-  
-  useEffect(() => {
-    const fetchClasses = async () => {
-      try {
-        setLoading(true);
-        const data = await listAvailableClasses(0, 100);
-        setClasses(data || []);
-      } catch (error) {
-        console.error('Failed to fetch classes:', error);
-        toast.error('Failed to load classes. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchClasses();
+  // Server-side pagination for classes
+  const fetchClasses = useCallback(async (skip: number, limit: number) => {
+    const res = await listAvailableClasses(skip, limit);
+    return res;
   }, []);
+
+  const {
+    data: classes,
+    isLoading,
+    currentPage,
+    totalPages,
+    totalItems,
+    setPage,
+    refresh
+  } = usePagination<GroupClass>(fetchClasses, { pageSize: PAGE_SIZE });
 
   const handleEnroll = async (classId: number) => {
     setEnrolling(classId);
     try {
       await enrollInClass(String(classId));
-      setClasses(prev => prev.map(cls => 
-        cls.class_id === classId 
-          ? { ...cls, current_enrollment: cls.current_enrollment + 1 } 
-          : cls
-      ));
       toast.success('Successfully enrolled in class!');
+      refresh(); // Refresh to get updated enrollment count
     } catch (error) {
       console.error('Failed to enroll:', error);
       toast.error('Failed to enroll in class. Please try again.');
@@ -90,23 +78,16 @@ export function ClassesPage({
     return <Badge variant="success">Available</Badge>;
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (isLoading && classes.length === 0) return <DashboardSkeleton />;
 
-  // Filter classes based on search term
-  const filteredClasses = classes.filter(classItem => 
-    classItem.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getTrainerName(classItem.trainer_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Update pagination to use filtered classes - but we need to call this conditionally
-  // This is problematic for hooks order, so we'll use the original pagination with all classes
-  // and filter the displayed results instead
-  const paginatedFilteredClasses = pagination.paginated.filter(classItem => 
-    classItem.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getTrainerName(classItem.trainer_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter classes based on search term (client-side filtering of server data)
+  const filteredClasses = searchTerm
+    ? classes.filter(classItem => 
+        classItem.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getTrainerName(classItem.trainer_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getRoomName(classItem.room_id).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : classes;
 
   return (
     <div>
@@ -151,7 +132,7 @@ export function ClassesPage({
       ) : (
         <>
           <div className="space-y-4">
-            {paginatedFilteredClasses.map((classItem) => (
+            {filteredClasses.map((classItem) => (
               <Card key={classItem.class_id}>
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -223,11 +204,11 @@ export function ClassesPage({
           {/* Pagination */}
           <div className="mt-6 flex justify-center">
             <Pagination
-              currentPage={pagination.currentPage}
-              totalPages={Math.max(1, Math.ceil(filteredClasses.length / 6))}
-              onPageChange={pagination.setCurrentPage}
-              totalItems={filteredClasses.length}
-              pageSize={6}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
             />
           </div>
         </>

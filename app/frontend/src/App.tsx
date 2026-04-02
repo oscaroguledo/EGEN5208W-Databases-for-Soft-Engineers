@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
 import { PageTransition } from '@/components/PageTransition';
@@ -163,14 +163,14 @@ export function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [fitnessGoals, setFitnessGoals] = useState<FitnessGoal[]>([]);
+  const [rooms] = useState<Room[]>([]);
+  const [fitnessGoals] = useState<FitnessGoal[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const [trainerAvailability, setTrainerAvailability] = useState<TrainerAvailability[]>([]);
   const [groupClasses, setGroupClasses] = useState<GroupClass[]>([]);
-  const [classRegistrations, setClassRegistrations] = useState<ClassRegistration[]>([]);
+  const [classRegistrations] = useState<ClassRegistration[]>([]);
   const [personalSessions, setPersonalSessions] = useState<PersonalSession[]>([]);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipment] = useState<Equipment[]>([]);
   // ─── API hydration: replace local fixtures with backend data when available
   useEffect(() => {
     let mounted = true;
@@ -306,13 +306,6 @@ export function App() {
   };
   const handleUpdateClass = (c: GroupClass) =>
   setGroupClasses((cs) => cs.map((x) => x.class_id === c.class_id ? c : x));
-  const handleAddEquipment = (e: Equipment) => setEquipment((eq) => [...eq, e]);
-  const handleUpdateEquipment = (e: Equipment) =>
-  setEquipment((eq) =>
-  eq.map((x) => x.equipment_id === e.equipment_id ? e : x)
-  );
-  const handleDeleteEquipment = (id: number) =>
-  setEquipment((eq) => eq.filter((x) => x.equipment_id !== id));
   // ─── Maintenance mode ──────────────────────────────────────────────────────
   if (MAINTENANCE_MODE) {
     return (
@@ -406,7 +399,6 @@ export function App() {
             currentUser={currentUser}
             members={members}
             healthMetrics={healthMetrics}
-            fitnessGoals={fitnessGoals}
             classRegistrations={classRegistrations}
             personalSessions={personalSessions}
             trainers={trainers}
@@ -420,8 +412,6 @@ export function App() {
           <ProfilePage
             currentUser={currentUser}
             members={members}
-            fitnessGoals={fitnessGoals}
-            healthMetrics={healthMetrics}
             onUpdateMember={handleUpdateMember}
             onAddGoal={handleAddGoal}
             onAddMetric={handleAddMetric} />);
@@ -436,9 +426,6 @@ export function App() {
       case 'member-classes':
         return (
           <ClassesPage
-            currentUser={currentUser}
-            members={members}
-            classes={groupClasses}
             trainers={trainers}
             rooms={rooms} />);
 

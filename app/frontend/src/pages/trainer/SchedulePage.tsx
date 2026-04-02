@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { CalendarIcon, UsersIcon, UserIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { StatusBadge } from '@/components/ui/Badge';
 import { ScheduleSkeleton } from '@/components/ui/Skeleton';
 import {
@@ -47,8 +48,73 @@ export function SchedulePage({
         .sort((a, b) => a.class_date.localeCompare(b.class_date) || a.start_time.localeCompare(b.start_time))
     : [];
 
-  const paginationSessions = usePagination(upcomingSessions, 6);
-  const paginationClasses = usePagination(upcomingClasses, 6);
+  // Server-side pagination for sessions
+  const fetchSessions = useCallback(async (skip: number, limit: number) => {
+    // Filter sessions for current trainer
+    const filtered = trainer
+      ? personalSessions
+          .filter((s) => s.trainer_id === trainer.trainer_id && s.session_date >= today && s.status === 'scheduled')
+          .sort((a, b) => a.session_date.localeCompare(b.session_date) || a.start_time.localeCompare(b.start_time))
+      : [];
+    
+    // Simulate server-side pagination
+    const page = Math.floor(skip / limit) + 1;
+    const paginatedData = filtered.slice(skip, skip + limit);
+    return {
+      status: 'success',
+      message: 'Sessions retrieved successfully',
+      status_code: 200,
+      data: paginatedData,
+      pagination: {
+        total: filtered.length,
+        page,
+        size: limit,
+        total_pages: Math.ceil(filtered.length / limit)
+      }
+    };
+  }, [trainer, personalSessions, today]);
+
+  const {
+    data: sessionsData,
+    currentPage: sessionsCurrentPage,
+    totalPages: sessionsTotalPages,
+    totalItems: sessionsTotalItems,
+    setPage: setSessionsPage,
+  } = usePagination<PersonalSession>(fetchSessions, { pageSize: 6 });
+
+  // Server-side pagination for classes
+  const fetchClasses = useCallback(async (skip: number, limit: number) => {
+    // Filter classes for current trainer
+    const filtered = trainer
+      ? groupClasses
+          .filter((c) => c.trainer_id === trainer.trainer_id && c.class_date >= today && c.status !== 'cancelled')
+          .sort((a, b) => a.class_date.localeCompare(b.class_date) || a.start_time.localeCompare(b.start_time))
+      : [];
+    
+    // Simulate server-side pagination
+    const page = Math.floor(skip / limit) + 1;
+    const paginatedData = filtered.slice(skip, skip + limit);
+    return {
+      status: 'success',
+      message: 'Classes retrieved successfully',
+      status_code: 200,
+      data: paginatedData,
+      pagination: {
+        total: filtered.length,
+        page,
+        size: limit,
+        total_pages: Math.ceil(filtered.length / limit)
+      }
+    };
+  }, [trainer, groupClasses, today]);
+
+  const {
+    data: classesData,
+    currentPage: classesCurrentPage,
+    totalPages: classesTotalPages,
+    totalItems: classesTotalItems,
+    setPage: setClassesPage,
+  } = usePagination<GroupClass>(fetchClasses, { pageSize: 6 });
 
   if (!trainer)
     return <div className="text-slate-500 dark:text-slate-400">Trainer profile not found.</div>;
@@ -121,9 +187,9 @@ export function SchedulePage({
               <UserIcon className="w-4 h-4 text-teal-600" />
               Personal Training Sessions
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{paginationSessions.totalItems} upcoming</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{sessionsTotalItems} upcoming</p>
           </div>
-          {paginationSessions.totalItems === 0 ? (
+          {sessionsTotalItems === 0 ? (
             <div className="px-6 py-12 text-center">
               <CalendarIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
               <p className="text-slate-400 dark:text-slate-500 text-sm">No upcoming personal sessions.</p>
@@ -131,7 +197,7 @@ export function SchedulePage({
           ) : (
 
           <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {paginationSessions.paginated.map((s) => {
+              {sessionsData.map((s: PersonalSession) => {
               const member = members.find((m) => m.member_id === s.member_id);
               const room = rooms.find((r) => r.room_id === s.room_id);
               return (
@@ -170,11 +236,11 @@ export function SchedulePage({
           )}
           <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
             <Pagination
-              currentPage={paginationSessions.currentPage}
-              totalPages={paginationSessions.totalPages}
-              onPageChange={paginationSessions.setCurrentPage}
-              totalItems={paginationSessions.totalItems}
-              pageSize={paginationSessions.pageSize}
+              currentPage={sessionsCurrentPage}
+              totalPages={sessionsTotalPages}
+              onPageChange={setSessionsPage}
+              totalItems={sessionsTotalItems}
+              pageSize={6}
             />
           </div>
         </Card>
@@ -186,16 +252,16 @@ export function SchedulePage({
               <UsersIcon className="w-4 h-4 text-blue-600" />
               Group Fitness Classes
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{paginationClasses.totalItems} upcoming</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{classesTotalItems} upcoming</p>
           </div>
-          {paginationClasses.totalItems === 0 ? (
+          {classesTotalItems === 0 ? (
             <div className="px-6 py-12 text-center">
               <UsersIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
               <p className="text-slate-400 dark:text-slate-500 text-sm">No upcoming group classes.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {paginationClasses.paginated.map((c) => {
+              {classesData.map((c: GroupClass) => {
                 const room = rooms.find((r) => r.room_id === c.room_id);
                 const fillPct = Math.round((c.current_enrollment / c.max_capacity) * 100);
                 return (
@@ -218,7 +284,7 @@ export function SchedulePage({
             </div>
           )}
           <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-            <Pagination currentPage={paginationClasses.currentPage} totalPages={paginationClasses.totalPages} onPageChange={paginationClasses.setCurrentPage} totalItems={paginationClasses.totalItems} pageSize={paginationClasses.pageSize} />
+            <Pagination currentPage={classesCurrentPage} totalPages={classesTotalPages} onPageChange={setClassesPage} totalItems={classesTotalItems} pageSize={6} />
           </div>
         </Card>
       </div>

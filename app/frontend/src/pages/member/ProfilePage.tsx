@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { UserIcon, TargetIcon, HeartPulseIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { CardHeader } from '@/components/ui/Card';
@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Badge } from '@/components/ui/Badge';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { Textarea } from '@/components/ui/Textarea';
 import { User, Member, FitnessGoal, HealthMetric } from '@/data/types';
 import { toast } from 'sonner';
@@ -16,12 +17,11 @@ import { ProfileSkeleton } from '@/components/ui/Skeleton';
 interface ProfilePageProps {
   currentUser: User;
   members: Member[];
-  fitnessGoals: FitnessGoal[];
-  healthMetrics: HealthMetric[];
   onUpdateMember: (updated: Member) => void;
   onAddGoal: (goal: FitnessGoal) => void;
   onAddMetric: (metric: HealthMetric) => void;
 }
+
 type Tab = 'profile' | 'goals' | 'metrics';
 const GOAL_OPTIONS = [
 {
@@ -85,8 +85,6 @@ const METRIC_UNITS: Record<string, string> = {
 export function ProfilePage({
   currentUser,
   members,
-  fitnessGoals,
-  healthMetrics,
   onUpdateMember,
   onAddGoal,
   onAddMetric
@@ -96,14 +94,51 @@ export function ProfilePage({
   const [savingGoal, setSavingGoal] = useState(false);
   const [savingMetric, setSavingMetric] = useState(false);
   const [tab, setTab] = useState<Tab>('profile');
+  const PAGE_SIZE = 4;
+
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
   }, []);
+
   const member = members.find((m) => m.user_id === currentUser.user_id)!;
   const mid = member?.member_id ?? -1;
-  const myGoals = fitnessGoals.filter((g) => g.member_id === mid && g.is_active);
-  const goalsPagination = usePagination(myGoals, 4);
+
+  // Server-side pagination for goals
+  const fetchGoals = useCallback(async (skip: number, limit: number) => {
+    const res = await membersApi.listGoals(String(mid), skip, limit);
+    // Filter active goals on the server response
+    const activeGoals = res.data?.filter((g: FitnessGoal) => g.is_active) || [];
+    return {
+      ...res,
+      data: activeGoals,
+      pagination: { ...res.pagination, total: activeGoals.length }
+    };
+  }, [mid]);
+
+  const {
+    data: goalsData,
+    currentPage: goalsCurrentPage,
+    totalPages: goalsTotalPages,
+    totalItems: goalsTotalItems,
+    setPage: setGoalsPage,
+  } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
+
+  // Server-side pagination for metrics
+  const fetchMetrics = useCallback(async (skip: number, limit: number) => {
+    const res = await membersApi.listHealthHistory(skip, limit);
+    return res;
+  }, []);
+
+  const {
+    data: metricsData,
+    currentPage: metricsCurrentPage,
+    totalPages: metricsTotalPages,
+    totalItems: metricsTotalItems,
+    setPage: setMetricsPage,
+  } = usePagination<HealthMetric>(fetchMetrics, { pageSize: PAGE_SIZE });
+
+  // Form states
   const [profileForm, setProfileForm] = useState({
     full_name: member?.full_name || '',
     phone: member?.phone || ''
@@ -119,6 +154,7 @@ export function ProfilePage({
     value: '',
     unit: ''
   });
+
   if (!member)
   return (
     <div className="text-slate-500 dark:text-slate-400">
@@ -400,9 +436,9 @@ export function ProfilePage({
           <Card>
               <CardHeader
                 title="Active Goals"
-                subtitle={`${myGoals.length} active`} />
+                subtitle={`${goalsData.length} active`} />
 
-              {myGoals.length === 0 ? (
+              {goalsData.length === 0 ? (
                 <div className="py-6 text-center">
                   <TargetIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
                   <p className="text-sm text-slate-400 dark:text-slate-500">
@@ -412,7 +448,7 @@ export function ProfilePage({
               ) : (
                 <>
                   <div className="space-y-3">
-                    {goalsPagination.paginated.map((g) => (
+                    {goalsData.map((g) => (
                       <div
                         key={g.goal_id}
                         className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
@@ -437,11 +473,11 @@ export function ProfilePage({
 
                   <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
                     <Pagination
-                      currentPage={goalsPagination.currentPage}
-                      totalPages={goalsPagination.totalPages}
-                      onPageChange={goalsPagination.setCurrentPage}
-                      totalItems={goalsPagination.totalItems}
-                      pageSize={goalsPagination.pageSize}
+                      currentPage={goalsCurrentPage}
+                      totalPages={goalsTotalPages}
+                      onPageChange={setGoalsPage}
+                      totalItems={goalsTotalItems}
+                      pageSize={PAGE_SIZE}
                     />
                   </div>
                 </>
@@ -506,12 +542,48 @@ export function ProfilePage({
           </div>
           <Card>
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              About Health Metrics
+              Recent Health Metrics
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Health metrics are stored as historical records. Each entry is
-              timestamped and cannot be edited after saving.
-            </p>
+            {metricsData.length === 0 ? (
+              <div className="py-4 text-center">
+                <HeartPulseIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  No metrics recorded yet.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {metricsData.map((metric) => (
+                    <div
+                      key={metric.metric_id}
+                      className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-700"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          {metric.metric_type}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {new Date(metric.recorded_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        {metric.value} {metric.unit}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
+                  <Pagination
+                    currentPage={metricsCurrentPage}
+                    totalPages={metricsTotalPages}
+                    onPageChange={setMetricsPage}
+                    totalItems={metricsTotalItems}
+                    pageSize={PAGE_SIZE}
+                  />
+                </div>
+              </>
+            )}
             <div className="mt-4 p-3 bg-teal-50 dark:bg-teal-900/30 rounded-xl border border-teal-100 dark:border-teal-800">
               <p className="text-xs text-teal-700 dark:text-teal-300 font-medium">
                 💡 Tip

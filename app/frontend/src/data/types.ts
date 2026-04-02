@@ -108,8 +108,9 @@ export interface Equipment {
   equipment_name: string;
   room_id: number;
   status: EquipmentStatus;
-  last_maintained: string;
-  notes: string;
+  maintenance_notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export function timesOverlap(

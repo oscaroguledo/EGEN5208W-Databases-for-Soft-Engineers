@@ -1,15 +1,11 @@
-import React, { useCallback, useState } from 'react';
-import {
-  UserPlusIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  InfoIcon } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { UserIcon } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { toast } from 'sonner';
-import { User, Member, Gender } from '@/data/types';
+import { User, Member } from '@/data/types';
 import * as membersApi from '@/apis/members';
 
 interface RegistrationPageProps {
@@ -283,7 +279,7 @@ export function RegistrationPage({
           <CardHeader
             title="New Member Account"
             subtitle="All fields marked with * are required"
-            action={<UserPlusIcon className="w-5 h-5 text-teal-600" />} />
+            action={<UserIcon className="w-5 h-5 text-teal-600" />} />
 
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>

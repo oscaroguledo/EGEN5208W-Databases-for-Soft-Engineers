@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { DumbbellIcon, WrenchIcon, ClockIcon, MailIcon } from 'lucide-react';
 interface MaintenancePageProps {

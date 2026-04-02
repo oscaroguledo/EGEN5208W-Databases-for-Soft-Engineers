@@ -69,3 +69,8 @@ export async function deleteEquipment(equipment_id: string) {
   const res = await api.delete(`/admin/equipment/${equipment_id}`);
   return handleAxiosResponse(res);
 }
+
+export async function getEquipmentStatusOptions() {
+  const res = await api.get('/admin/equipment/status-options');
+  return handleAxiosResponse(res);
+}

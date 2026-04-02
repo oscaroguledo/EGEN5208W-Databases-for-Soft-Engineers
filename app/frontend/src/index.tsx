@@ -1,22 +1,25 @@
-import React from 'react';
-import './index.css';
-import { render } from 'react-dom';
-import { Toaster } from 'sonner';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { App } from '@/App';
+import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/components/ThemeProvider';
-render(
-  <ThemeProvider>
-    <App />
-    <Toaster
-      position="top-right"
-      richColors
-      toastOptions={{
-        duration: 3500,
-        style: {
-          fontFamily: 'Inter, system-ui, sans-serif'
-        }
-      }} />
 
-  </ThemeProvider>,
-  document.getElementById('root')
+const root = createRoot(document.getElementById('root')!);
+root.render(
+  <StrictMode>
+    <ThemeProvider>
+      <App />
+      <Toaster
+        position="top-right"
+        richColors
+        toastOptions={{
+          style: {
+            background: 'hsl(var(--background))',
+            border: '1px solid hsl(var(--border))',
+            color: 'hsl(var(--foreground))'
+          }
+        }}
+      />
+    </ThemeProvider>
+  </StrictMode>
 );

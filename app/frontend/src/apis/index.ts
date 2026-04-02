@@ -16,3 +16,10 @@ export function handleAxiosResponse(res: any) {
 }
 
 export default api;
+
+// Export all API functions for easy importing
+export * from './admin';
+export * from './auth';
+export * from './health';
+export * from './members';
+export * from './trainers';

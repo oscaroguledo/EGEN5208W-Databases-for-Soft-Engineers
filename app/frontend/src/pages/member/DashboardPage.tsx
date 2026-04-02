@@ -1,68 +1,104 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIcon, TargetIcon, CalendarIcon, UsersIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader } from '@/components/ui/Card';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { Badge } from '@/components/ui/Badge';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
-import {
-  User,
-  Member,
-  HealthMetric,
-  FitnessGoal,
-  ClassRegistration,
-  PersonalSession,
-  Trainer,
-  Room } from
-'@/data/types';
-import { bookSession } from '@/apis/members';
+import { User, Member, FitnessGoal, HealthMetric, ClassRegistration, PersonalSession, Trainer, Room } from '@/data/types';
+import * as membersApi from '@/apis/members';
+
 interface DashboardPageProps {
   currentUser: User;
   members: Member[];
   healthMetrics: HealthMetric[];
-  fitnessGoals: FitnessGoal[];
   classRegistrations: ClassRegistration[];
   personalSessions: PersonalSession[];
   trainers: Trainer[];
   rooms: Room[];
-  onAddSession?: (s: PersonalSession) => void;
   onBookSession?: (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; notes?: string }) => Promise<any> | void;
+  onAddSession?: (session: PersonalSession) => void;
 }
+
+const PAGE_SIZE = 4;
 export function DashboardPage({
   currentUser,
   members,
   healthMetrics,
-  fitnessGoals,
   classRegistrations,
   personalSessions,
   trainers,
-  rooms
+  rooms,
+  onBookSession,
+  onAddSession
 }: DashboardPageProps) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Debug: Log current data
-  console.log('Dashboard Data:', {
-    currentUser,
-    members: members.length,
-    healthMetrics: healthMetrics.length,
-    fitnessGoals: fitnessGoals.length,
-    classRegistrations: classRegistrations.length,
-    personalSessions: personalSessions.length,
-    trainers: trainers.length,
-    rooms: rooms.length
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    trainer_id: trainers[0]?.trainer_id ?? -1,
+    room_id: rooms[0]?.room_id ?? -1,
+    session_date: new Date().toISOString().split('T')[0],
+    start_time: '09:00',
+    end_time: '10:00',
+    notes: ''
   });
+  
+  // Simulate loading
+  setTimeout(() => setLoading(false), 500);
 
   const member = members.find((m) => m.user_id === currentUser.user_id);
-  console.log('Found member:', member, 'Looking for user_id:', currentUser.user_id);
   const mid = member?.member_id ?? -1;
-  const activeGoals = fitnessGoals.filter(
-    (g) => g.member_id === mid && g.is_active
+  
+  // Server-side pagination for goals
+  const fetchGoals = useCallback(async (skip: number, limit: number) => {
+    const res = await membersApi.listGoals(String(mid), skip, limit);
+    // Filter active goals
+    const activeGoals = res.data?.filter((g: FitnessGoal) => g.is_active) || [];
+    return {
+      ...res,
+      data: activeGoals,
+      pagination: { ...res.pagination, total: activeGoals.length }
+    };
+  }, [mid]);
+
+  const {
+    data: activeGoals,
+    currentPage: goalsCurrentPage,
+    totalPages: goalsTotalPages,
+    totalItems: goalsTotalItems,
+    setPage: setGoalsPage,
+  } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
+
+  // Client-side data for other sections (to be converted later)
+  const myMetrics = healthMetrics.filter((m) => m.member_id === mid);
+  const metricTypes = [...new Set(myMetrics.map((m) => m.metric_type))];
+  const latestMetrics = metricTypes.map(
+    (type) =>
+    myMetrics.
+    filter((m) => m.metric_type === type).
+    sort(
+      (a: HealthMetric, b: HealthMetric) =>
+      new Date(b.recorded_at).getTime() -
+      new Date(a.recorded_at).getTime()
+    )[0]
   );
-  const goalsPagination = usePagination(activeGoals, 4);
+  const classesAttended = classRegistrations.filter(
+    (r) => r.member_id === mid && r.attended
+  ).length;
+  const today = new Date().toISOString().split('T')[0];
+  const upcomingSessions = personalSessions.
+  filter(
+    (s) =>
+    s.member_id === mid &&
+    s.session_date >= today &&
+    s.status === 'scheduled'
+  ).
+  sort(
+    (a: PersonalSession, b: PersonalSession) =>
+    a.session_date.localeCompare(b.session_date) ||
+    a.start_time.localeCompare(b.start_time)
+  );
 
   if (!member) {
     return (
@@ -83,44 +119,7 @@ export function DashboardPage({
   }
 
   if (loading) return <DashboardSkeleton />;
-  const myMetrics = healthMetrics.filter((m) => m.member_id === mid);
-  const metricTypes = [...new Set(myMetrics.map((m) => m.metric_type))];
-  const latestMetrics = metricTypes.map(
-    (type) =>
-    myMetrics.
-    filter((m) => m.metric_type === type).
-    sort(
-      (a, b) =>
-      new Date(b.recorded_at).getTime() -
-      new Date(a.recorded_at).getTime()
-    )[0]
-  );
-  // activeGoals and pagination are initialized above to keep hooks stable
-  const classesAttended = classRegistrations.filter(
-    (r) => r.member_id === mid && r.attended
-  ).length;
-  const today = new Date().toISOString().split('T')[0];
-  const upcomingSessions = personalSessions.
-  filter(
-    (s) =>
-    s.member_id === mid &&
-    s.session_date >= today &&
-    s.status === 'scheduled'
-  ).
-  sort(
-    (a, b) =>
-    a.session_date.localeCompare(b.session_date) ||
-    a.start_time.localeCompare(b.start_time)
-  );
-  const [bookingOpen, setBookingOpen] = React.useState(false);
-  const [bookingForm, setBookingForm] = React.useState({
-    trainer_id: trainers[0]?.trainer_id ?? -1,
-    room_id: rooms[0]?.room_id ?? -1,
-    session_date: today,
-    start_time: '09:00',
-    end_time: '10:00',
-    notes: ''
-  });
+  
   const handleBookSession = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -146,7 +145,7 @@ export function DashboardPage({
     }
     // Fallback: try members API directly
     try {
-      const res = await bookSession(payload);
+      const res = await membersApi.bookSession(payload);
       const created = res && (res.session || res);
       if (created && onAddSession) {
         onAddSession(created as PersonalSession);
@@ -168,7 +167,8 @@ export function DashboardPage({
         start_time: bookingForm.start_time,
         end_time: bookingForm.end_time,
         status: 'scheduled',
-        notes: bookingForm.notes
+        notes: bookingForm.notes,
+        created_at: new Date().toISOString()
       };
       onAddSession(created);
       toast.success('Session booked (local).');
@@ -334,7 +334,7 @@ export function DashboardPage({
 
               <>
                 <div className="space-y-3">
-                  {goalsPagination.paginated.map((g) => (
+                  {activeGoals.map((g) => (
                     <div
                       key={g.goal_id}
                       className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
@@ -359,15 +359,15 @@ export function DashboardPage({
 
                 <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
                   <Pagination
-                    currentPage={goalsPagination.currentPage}
-                    totalPages={goalsPagination.totalPages}
-                    onPageChange={goalsPagination.setCurrentPage}
-                    totalItems={goalsPagination.totalItems}
-                    pageSize={goalsPagination.pageSize}
+                    currentPage={goalsCurrentPage}
+                    totalPages={goalsTotalPages}
+                    onPageChange={setGoalsPage}
+                    totalItems={goalsTotalItems}
+                    pageSize={PAGE_SIZE}
                   />
                 </div>
               </>
-            )
+            )}
           </Card>
         </div>
 

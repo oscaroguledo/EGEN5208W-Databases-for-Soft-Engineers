@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   ClockIcon,
   PlusIcon,
@@ -11,7 +11,8 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { AvailabilitySkeleton } from '@/components/ui/Skeleton';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/useServerPagination';
 import { toast } from 'sonner';
 import {
   User,
@@ -58,13 +59,40 @@ export function AvailabilityPage({
   }, []);
   
   const trainer = trainers.find((t) => t.user_id === currentUser.user_id);
-  const mySlots = trainer
-    ? availability
-        .filter((a) => a.trainer_id === trainer.trainer_id)
-        .sort((a, b) => a.available_date.localeCompare(b.available_date) || a.start_time.localeCompare(b.start_time))
-    : [];
 
-  const pagination = usePagination(mySlots, 6);
+  // Server-side pagination for availability slots
+  const fetchAvailability = useCallback(async (skip: number, limit: number) => {
+    // Filter availability for current trainer
+    const filtered = trainer
+      ? availability
+          .filter((a) => a.trainer_id === trainer.trainer_id)
+          .sort((a, b) => a.available_date.localeCompare(b.available_date) || a.start_time.localeCompare(b.start_time))
+      : [];
+    
+    // Simulate server-side pagination
+    const page = Math.floor(skip / limit) + 1;
+    const paginatedData = filtered.slice(skip, skip + limit);
+    return {
+      status: 'success',
+      message: 'Availability retrieved successfully',
+      status_code: 200,
+      data: paginatedData,
+      pagination: {
+        total: filtered.length,
+        page,
+        size: limit,
+        total_pages: Math.ceil(filtered.length / limit)
+      }
+    };
+  }, [trainer, availability]);
+
+  const {
+    data: availabilityData,
+    currentPage: availabilityCurrentPage,
+    totalPages: availabilityTotalPages,
+    totalItems: availabilityTotalItems,
+    setPage: setAvailabilityPage,
+  } = usePagination<TrainerAvailability>(fetchAvailability, { pageSize: 6 });
 
   if (!trainer)
     return (
@@ -232,14 +260,14 @@ export function AvailabilityPage({
             <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">My Availability Slots</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{mySlots.length} slot{mySlots.length !== 1 ? 's' : ''} defined</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{availabilityTotalItems} slot{availabilityTotalItems !== 1 ? 's' : ''} defined</p>
               </div>
               <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/40 rounded-lg flex items-center justify-center">
                 <ClockIcon className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               </div>
             </div>
 
-            {mySlots.length === 0 ? (
+            {availabilityTotalItems === 0 ? (
               <div className="px-6 py-14 text-center">
                 <ClockIcon className="w-12 h-12 text-slate-200 dark:text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-500 dark:text-slate-400 font-medium">No availability slots defined yet.</p>
@@ -248,7 +276,7 @@ export function AvailabilityPage({
             ) : (
               <div>
                 <div className="divide-y divide-slate-50 dark:divide-slate-700">
-                      {pagination.paginated.map((slot) => (
+                      {availabilityData.map((slot: TrainerAvailability) => (
                     <div key={slot.availability_id} className="px-4 sm:px-6 py-4">
                       {editingId === slot.availability_id ? (
                         <div className="flex flex-wrap items-end gap-3">
@@ -295,11 +323,11 @@ export function AvailabilityPage({
                 </div>
                 <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
                   <Pagination
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                    onPageChange={pagination.setCurrentPage}
-                    totalItems={pagination.totalItems}
-                    pageSize={pagination.pageSize}
+                    currentPage={availabilityCurrentPage}
+                    totalPages={availabilityTotalPages}
+                    onPageChange={setAvailabilityPage}
+                    totalItems={availabilityTotalItems}
+                    pageSize={6}
                   />
                 </div>
               </div>
