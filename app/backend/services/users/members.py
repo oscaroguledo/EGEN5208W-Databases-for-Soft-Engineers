@@ -111,12 +111,15 @@ class MemberService:
         member_id: Optional[UUID],
         skip: int = 0,
         limit: int = 20,
-    ) -> List[FitnessGoal]:
-        q = select(FitnessGoal)
+    ) -> Tuple[List[FitnessGoal], int]:
+        count_q = select(func.count(FitnessGoal.id))
+        data_q = select(FitnessGoal).order_by(FitnessGoal.created_at.desc())
         if member_id:
-            q = q.where(FitnessGoal.member_id == member_id)
-        q = q.order_by(FitnessGoal.created_at.desc()).offset(skip).limit(limit)
-        return (await db.execute(q)).scalars().all()
+            count_q = count_q.where(FitnessGoal.member_id == member_id)
+            data_q = data_q.where(FitnessGoal.member_id == member_id)
+        total = (await db.execute(count_q)).scalar()
+        goals = (await db.execute(data_q.offset(skip).limit(limit))).scalars().all()
+        return goals, total
 
     # ── health metrics ─────────────────────────────────────────────────────
 
@@ -125,13 +128,18 @@ class MemberService:
         db: AsyncSession,
         member_id: UUID,
         metric_type: Optional[str] = None,
+        skip: int = 0,
         limit: int = 100,
-    ) -> List[HealthMetric]:
-        q = select(HealthMetric).where(HealthMetric.member_id == member_id)
+    ) -> Tuple[List[HealthMetric], int]:
+        count_q = select(func.count(HealthMetric.id)).where(HealthMetric.member_id == member_id)
+        data_q = select(HealthMetric).where(HealthMetric.member_id == member_id)
         if metric_type:
-            q = q.where(HealthMetric.metric_type == metric_type)
-        q = q.order_by(HealthMetric.recorded_at.desc()).limit(limit)
-        return (await db.execute(q)).scalars().all()
+            count_q = count_q.where(HealthMetric.metric_type == metric_type)
+            data_q = data_q.where(HealthMetric.metric_type == metric_type)
+        data_q = data_q.order_by(HealthMetric.recorded_at.desc())
+        total = (await db.execute(count_q)).scalar()
+        metrics = (await db.execute(data_q.offset(skip).limit(limit))).scalars().all()
+        return metrics, total
 
     @staticmethod
     async def add_health_metric(
@@ -160,12 +168,16 @@ class MemberService:
         skip: int = 0,
         limit: int = 100,
         class_date: Optional[date] = None,
-    ) -> List[Class]:
-        q = select(Class).where(Class.class_date >= date.today())
+    ) -> Tuple[List[Class], int]:
+        count_q = select(func.count(Class.id)).where(Class.class_date >= date.today())
+        data_q = select(Class).where(Class.class_date >= date.today())
         if class_date:
-            q = q.where(Class.class_date == class_date)
-        q = q.order_by(Class.class_date, Class.start_time).offset(skip).limit(limit)
-        return (await db.execute(q)).scalars().all()
+            count_q = count_q.where(Class.class_date == class_date)
+            data_q = data_q.where(Class.class_date == class_date)
+        data_q = data_q.order_by(Class.class_date, Class.start_time)
+        total = (await db.execute(count_q)).scalar()
+        classes = (await db.execute(data_q.offset(skip).limit(limit))).scalars().all()
+        return classes, total
 
     @staticmethod
     async def enroll_in_class(
@@ -329,62 +341,3 @@ class MemberService:
             "upcoming_classes": [c.to_dict() for c in classes],
             "upcoming_sessions": [s.to_dict() for s in sessions],
         }
-
-    @staticmethod
-    async def get_dashboard_with_view(db: AsyncSession, member_id: UUID) -> dict:
-        from sqlalchemy import text
-        query = text("""
-            SELECT DISTINCT
-                member_id, full_name, email,
-                metric_type, metric_value, recorded_at,
-                goal_description, goal_target, total_classes_attended,
-                session_date, start_time, end_time,
-                trainer_name, room_name,
-                class_name, class_date, class_start_time, class_end_time
-            FROM member_dashboard_view
-            WHERE member_id = :member_id
-            ORDER BY recorded_at DESC NULLS LAST, session_date ASC
-        """)
-        rows = (await db.execute(query, {"member_id": str(member_id)})).fetchall()
-        dashboard = {
-            "member_info": {
-                "full_name": rows[0].full_name if rows else None,
-                "email": rows[0].email if rows else None,
-            },
-            "recent_health_metrics": [],
-            "active_goals": [],
-            "upcoming_sessions": [],
-            "upcoming_classes": [],
-            "total_classes_attended": 0,
-        }
-        for row in rows:
-            if row.metric_type:
-                dashboard["recent_health_metrics"].append({
-                    "metric_type": row.metric_type,
-                    "metric_value": float(row.metric_value),
-                    "recorded_at": row.recorded_at.isoformat() if row.recorded_at else None,
-                })
-            if row.goal_description:
-                dashboard["active_goals"].append({
-                    "description": row.goal_description,
-                    "target_value": row.goal_target,
-                })
-            if row.session_date and row.trainer_name:
-                dashboard["upcoming_sessions"].append({
-                    "session_date": row.session_date.isoformat(),
-                    "start_time": row.start_time.isoformat() if row.start_time else None,
-                    "end_time": row.end_time.isoformat() if row.end_time else None,
-                    "trainer_name": row.trainer_name,
-                    "room_name": row.room_name,
-                })
-            if row.class_date and row.class_name:
-                dashboard["upcoming_classes"].append({
-                    "class_date": row.class_date.isoformat(),
-                    "class_name": row.class_name,
-                    "start_time": row.class_start_time.isoformat() if row.class_start_time else None,
-                    "end_time": row.class_end_time.isoformat() if row.class_end_time else None,
-                    "room_name": row.room_name,
-                })
-            if row.total_classes_attended:
-                dashboard["total_classes_attended"] = row.total_classes_attended
-        return dashboard

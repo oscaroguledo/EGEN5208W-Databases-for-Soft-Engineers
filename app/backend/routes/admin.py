@@ -6,7 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from core.db import get_db
-from core.auth import require_admin
+from core.auth import require_admin, require_any_role
 from core.response import APIResponse, Pagination
 
 from services.users.admin_staff import AdminStaffService
@@ -94,57 +94,7 @@ async def assign_room_to_session(
             detail=str(e)
         )
 
-@router.get("/equipment-optimized", response_model=APIResponse[List])
-async def get_all_equipment_optimized(
-    status_filter: str = None,
-    current_user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """View all equipment using database view for optimized performance"""
-    equipment_list = await AdminStaffService.get_equipment_with_view(
-        db=db,
-        status_filter=status_filter
-    )
-    
-    return APIResponse(
-        status="success",
-        message="Equipment list retrieved (optimized)",
-        data=equipment_list,
-        status_code=200
-    )
-
 @router.get("/equipment", response_model=APIResponse[List])
-async def get_all_equipment(
-    skip: int = 0,
-    limit: int = 20,
-    status_filter: str = None,
-    current_user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """View all equipment with pagination (admin only)"""
-    equipment_list, total = await AdminStaffService.list_equipments(
-        db=db,
-        skip=skip,
-        limit=limit,
-        status=status_filter
-    )
-    
-    total_pages = (total + limit - 1) // limit if limit > 0 else 1
-    
-    return APIResponse(
-        status="success",
-        message="Equipment list retrieved with pagination",
-        data=[e.to_dict() for e in equipment_list],
-        pagination=Pagination(
-            total=total,
-            page=(skip // limit) + 1,
-            size=limit,
-            total_pages=total_pages
-        ),
-        status_code=200
-    )
-
-@router.get("/equipment/list", response_model=APIResponse[List])
 async def list_equipment_paginated(
     skip: int = 0,
     limit: int = 20,
@@ -179,6 +129,27 @@ class EquipmentStatusRequest(BaseModel):
     """Equipment status update request"""
     status: str
     notes: Optional[str] = None
+
+
+@router.get("/equipment/status-options", response_model=APIResponse[List[dict]])
+async def get_equipment_status_options(
+    current_user: User = Depends(require_admin)
+):
+    """Get available equipment status options"""
+    from models.equipments import EquipmentStatus
+    
+    status_options = [
+        {"value": EquipmentStatus.operational.value, "label": "Operational"},
+        {"value": EquipmentStatus.under_repair.value, "label": "Under Repair"},
+        {"value": EquipmentStatus.out_of_service.value, "label": "Out of Service"}
+    ]
+    
+    return APIResponse(
+        status="success",
+        message="Equipment status options retrieved",
+        data=status_options,
+        status_code=200
+    )
 
 
 @router.put("/equipment/{equipment_id}/status", response_model=APIResponse[dict])
@@ -217,26 +188,6 @@ async def update_equipment_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid equipment status"
         )
-
-@router.get("/equipment/status-options", response_model=APIResponse[List[dict]])
-async def get_equipment_status_options(
-    current_user: User = Depends(require_admin)
-):
-    """Get available equipment status options"""
-    from models.equipments import EquipmentStatus
-    
-    status_options = [
-        {"value": EquipmentStatus.operational.value, "label": "Operational"},
-        {"value": EquipmentStatus.under_repair.value, "label": "Under Repair"},
-        {"value": EquipmentStatus.out_of_service.value, "label": "Out of Service"}
-    ]
-    
-    return APIResponse(
-        status="success",
-        message="Equipment status options retrieved",
-        data=status_options,
-        status_code=200
-    )
 
 class CreateEquipmentRequest(BaseModel):
     """Create equipment request"""
@@ -416,7 +367,7 @@ async def list_payments(
     subscription_id: UUID = None,
     status_filter: str = None,
     current_user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List payments with pagination (admin only)"""
     payments, total = await AdminStaffService.list_payments(
@@ -434,6 +385,36 @@ async def list_payments(
         status="success",
         message="Payments list retrieved with pagination",
         data=[p.to_dict() for p in payments],
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
+        status_code=200
+    )
+
+
+@router.get("/rooms", response_model=APIResponse[List])
+async def list_rooms(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(require_any_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all rooms (authenticated users)"""
+    rooms, total = await AdminStaffService.list_rooms(
+        db=db,
+        skip=skip,
+        limit=limit
+    )
+    
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
+    return APIResponse(
+        status="success",
+        message="Rooms list retrieved",
+        data=[r.to_dict() for r in rooms],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,

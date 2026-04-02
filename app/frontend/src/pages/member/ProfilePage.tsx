@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UserIcon, TargetIcon, HeartPulseIcon } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { CardHeader } from '@/components/ui/Card';
+import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -23,311 +22,132 @@ interface ProfilePageProps {
 }
 
 type Tab = 'profile' | 'goals' | 'metrics';
-const GOAL_OPTIONS = [
-{
-  value: '',
-  label: 'Select goal type'
-},
-{
-  value: 'Weight Loss',
-  label: 'Weight Loss'
-},
-{
-  value: 'Muscle Gain',
-  label: 'Muscle Gain'
-},
-{
-  value: 'Cardio Fitness',
-  label: 'Cardio Fitness'
-},
-{
-  value: 'Flexibility',
-  label: 'Flexibility'
-},
-{
-  value: 'Endurance',
-  label: 'Endurance'
-}];
 
 const METRIC_OPTIONS = [
-{
-  value: '',
-  label: 'Select metric type'
-},
-{
-  value: 'Weight',
-  label: 'Weight'
-},
-{
-  value: 'Heart Rate',
-  label: 'Heart Rate'
-},
-{
-  value: 'BMI',
-  label: 'BMI'
-},
-{
-  value: 'Blood Pressure',
-  label: 'Blood Pressure'
-},
-{
-  value: 'Body Fat',
-  label: 'Body Fat %'
-}];
+  { value: '', label: 'Select metric type' },
+  { value: 'Weight', label: 'Weight' },
+  { value: 'Heart Rate', label: 'Heart Rate' },
+  { value: 'BMI', label: 'BMI' },
+  { value: 'Blood Pressure', label: 'Blood Pressure' },
+  { value: 'Body Fat', label: 'Body Fat %' },
+];
 
-const METRIC_UNITS: Record<string, string> = {
-  Weight: 'kg',
-  'Heart Rate': 'bpm',
-  BMI: 'kg/m²',
-  'Blood Pressure': 'mmHg',
-  'Body Fat': '%'
-};
-export function ProfilePage({
-  currentUser,
-  members,
-  onUpdateMember,
-  onAddGoal,
-  onAddMetric
-}: ProfilePageProps) {
-  const [loading, setLoading] = useState(true);
+export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetric }: ProfilePageProps) {
+  const [loading, setLoading]           = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingGoal, setSavingGoal] = useState(false);
+  const [savingGoal, setSavingGoal]     = useState(false);
   const [savingMetric, setSavingMetric] = useState(false);
-  const [tab, setTab] = useState<Tab>('profile');
+  const [tab, setTab]                   = useState<Tab>('profile');
+  const [member, setMember]             = useState<Member | null>(null);
   const PAGE_SIZE = 4;
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+    let mounted = true;
+    membersApi.getMemberMe().then(data => {
+      if (mounted && data) setMember(data as Member);
+    }).catch(() => {}).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [currentUser.id]);
 
-  const member = members.find((m) => m.user_id === currentUser.user_id)!;
-  const mid = member?.member_id ?? -1;
-
-  // Server-side pagination for goals
   const fetchGoals = useCallback(async (skip: number, limit: number) => {
-    const res = await membersApi.listGoals(String(mid), skip, limit);
-    // Filter active goals on the server response
-    const activeGoals = res.data?.filter((g: FitnessGoal) => g.is_active) || [];
-    return {
-      ...res,
-      data: activeGoals,
-      pagination: { ...res.pagination, total: activeGoals.length }
-    };
-  }, [mid]);
-
-  const {
-    data: goalsData,
-    currentPage: goalsCurrentPage,
-    totalPages: goalsTotalPages,
-    totalItems: goalsTotalItems,
-    setPage: setGoalsPage,
-  } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
-
-  // Server-side pagination for metrics
-  const fetchMetrics = useCallback(async (skip: number, limit: number) => {
-    const res = await membersApi.listHealthHistory(skip, limit);
-    return res;
+    return membersApi.listGoals(undefined, skip, limit);
   }, []);
 
-  const {
-    data: metricsData,
-    currentPage: metricsCurrentPage,
-    totalPages: metricsTotalPages,
-    totalItems: metricsTotalItems,
-    setPage: setMetricsPage,
-  } = usePagination<HealthMetric>(fetchMetrics, { pageSize: PAGE_SIZE });
+  const { data: goalsData, currentPage: goalsPage, totalPages: goalsTotalPages,
+    totalItems: goalsTotalItems, setPage: setGoalsPage } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
 
-  // Form states
-  const [profileForm, setProfileForm] = useState({
-    full_name: member?.full_name || '',
-    phone: member?.phone || ''
-  });
-  const [goalForm, setGoalForm] = useState({
-    goal_type: '',
-    target_value: '',
-    target_unit: '',
-    description: ''
-  });
-  const [metricForm, setMetricForm] = useState({
-    metric_type: '',
-    value: '',
-    unit: ''
-  });
+  const fetchMetrics = useCallback(async (skip: number, limit: number) => {
+    return membersApi.listHealthHistory(skip, limit);
+  }, []);
 
-  if (!member)
-  return (
-    <div className="text-slate-500 dark:text-slate-400">
-        Member profile not found.
-      </div>);
+  const { data: metricsData, currentPage: metricsPage, totalPages: metricsTotalPages,
+    totalItems: metricsTotalItems, setPage: setMetricsPage } = usePagination<HealthMetric>(fetchMetrics, { pageSize: PAGE_SIZE });
+
+  const [profileForm, setProfileForm] = useState({ full_name: '', phone: '' });
+  const [goalForm, setGoalForm]       = useState({ description: '', target_value: '' });
+  const [metricForm, setMetricForm]   = useState({ metric_type: '', value: '' });
+
+  // Sync form once member data loads
+  useEffect(() => {
+    if (member) setProfileForm({ full_name: member.full_name || '', phone: member.phone || '' });
+  }, [member]);
 
   if (loading) return <ProfileSkeleton />;
-  const handleProfileSave = (e: React.FormEvent) => {
+  if (!member) return <div className="text-slate-500 dark:text-slate-400">Member profile not found.</div>;
+
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileForm.full_name.trim()) {
-      toast.error('Full name cannot be empty.');
-      return;
-    }
+    if (!profileForm.full_name.trim()) { toast.error('Full name cannot be empty.'); return; }
     setSavingProfile(true);
-    (async () => {
-      try {
-        const res = await membersApi.updateMemberMe({ full_name: profileForm.full_name, phone: profileForm.phone });
-        const updated = res && (res.member || res);
-        if (updated) {
-          onUpdateMember(updated as Member);
-          toast.success('Profile updated successfully.');
-        } else {
-          toast.error('Failed to update profile.');
-        }
-      } catch (err) {
-        toast.error('Failed to update profile.');
-      }
-      setSavingProfile(false);
-    })();
+    try {
+      const updated = await membersApi.updateMemberMe({ full_name: profileForm.full_name, phone: profileForm.phone });
+      setMember(updated as Member);
+      onUpdateMember(updated as Member);
+      toast.success('Profile updated successfully.');
+    } catch { toast.error('Failed to update profile.'); }
+    setSavingProfile(false);
   };
-  const handleAddGoal = (e: React.FormEvent) => {
+
+  const handleAddGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!goalForm.goal_type.trim()) {
-      toast.error('Goal type is required.');
-      return;
-    }
+    if (!goalForm.description.trim()) { toast.error('Description is required.'); return; }
     setSavingGoal(true);
-    (async () => {
-      try {
-        const newGoal = {
-          member_id: member.member_id,
-          goal_type: goalForm.goal_type,
-          target_value: parseFloat(goalForm.target_value) || 0,
-          target_unit: goalForm.target_unit,
-          description: goalForm.description,
-          is_active: true
-        };
-        const res = await membersApi.updateGoals([newGoal]);
-        const created = res && (Array.isArray(res) ? res[0] : (res.goal || res));
-        if (created) {
-          onAddGoal(created as FitnessGoal);
-          setGoalForm({ goal_type: '', target_value: '', target_unit: '', description: '' });
-          toast.success(`Fitness goal "${newGoal.goal_type}" added successfully.`);
-        } else {
-          toast.error('Failed to add goal.');
-        }
-      } catch (err) {
-        toast.error('Failed to add goal.');
-      }
-      setSavingGoal(false);
-    })();
+    try {
+      const results = await membersApi.updateGoals([{ description: goalForm.description, target_value: goalForm.target_value || null }]);
+      const created = Array.isArray(results) ? results[0] : results;
+      if (created) { onAddGoal(created as FitnessGoal); setGoalForm({ description: '', target_value: '' }); toast.success('Goal added.'); }
+    } catch { toast.error('Failed to add goal.'); }
+    setSavingGoal(false);
   };
-  const handleAddMetric = (e: React.FormEvent) => {
+
+  const handleAddMetric = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!metricForm.metric_type || !metricForm.value) {
-      toast.error('Metric type and value are required.');
-      return;
-    }
+    if (!metricForm.metric_type || !metricForm.value) { toast.error('Metric type and value are required.'); return; }
     setSavingMetric(true);
-    (async () => {
-      try {
-        const res = await membersApi.addHealthMetric(metricForm.metric_type, parseFloat(metricForm.value));
-        const created = res && (res.metric || res);
-        if (created) {
-          onAddMetric(created as HealthMetric);
-          setMetricForm({ metric_type: '', value: '', unit: '' });
-          toast.success(`Health metric "${metricForm.metric_type}" recorded successfully.`);
-        } else {
-          toast.error('Failed to record metric.');
-        }
-      } catch (err) {
-        toast.error('Failed to record metric.');
-      }
-      setSavingMetric(false);
-    })();
+    try {
+      const res = await membersApi.addHealthMetric(metricForm.metric_type, parseFloat(metricForm.value));
+      onAddMetric(res as HealthMetric);
+      setMetricForm({ metric_type: '', value: '' });
+      toast.success(`${metricForm.metric_type} recorded.`);
+    } catch { toast.error('Failed to record metric.'); }
+    setSavingMetric(false);
   };
-  const tabs: {
-    id: Tab;
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-  {
-    id: 'profile',
-    label: 'Profile',
-    icon: <UserIcon className="w-4 h-4" />
-  },
-  {
-    id: 'goals',
-    label: 'Fitness Goals',
-    icon: <TargetIcon className="w-4 h-4" />
-  },
-  {
-    id: 'metrics',
-    label: 'Log Metric',
-    icon: <HeartPulseIcon className="w-4 h-4" />
-  }];
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'profile', label: 'Profile', icon: <UserIcon className="w-4 h-4" /> },
+    { id: 'goals', label: 'Fitness Goals', icon: <TargetIcon className="w-4 h-4" /> },
+    { id: 'metrics', label: 'Log Metric', icon: <HeartPulseIcon className="w-4 h-4" /> },
+  ];
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Profile Management
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Update your profile, manage goals, and log health metrics
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Profile Management</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Update your profile, manage goals, and log health metrics</p>
       </div>
 
-      {/* Tab bar */}
       <div className="flex gap-0 mb-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 w-fit shadow-sm overflow-x-auto">
-        {tabs.map((t) =>
-        <button
-          key={t.id}
-          onClick={() => setTab(t.id)}
-          className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap ${tab === t.id ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-
-            {t.icon}
-            <span className="hidden sm:inline">{t.label}</span>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap ${tab === t.id ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+            {t.icon}<span className="hidden sm:inline">{t.label}</span>
           </button>
-        )}
+        ))}
       </div>
 
-      {tab === 'profile' &&
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {tab === 'profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <Card>
-              <CardHeader
-              title="Edit Profile"
-              subtitle="Update your name and contact information" />
-
+              <CardHeader title="Edit Profile" subtitle="Update your name and contact information" />
               <form onSubmit={handleProfileSave} className="space-y-4">
-                <Input
-                label="Full Name"
-                value={profileForm.full_name}
-                onChange={(e) =>
-                setProfileForm((f) => ({
-                  ...f,
-                  full_name: e.target.value
-                }))
-                } />
-
-                <Input
-                label="Email Address"
-                value={member.email}
-                disabled
-                hint="Email cannot be changed" />
-
-                <Input
-                label="Phone Number"
-                value={profileForm.phone}
-                onChange={(e) =>
-                setProfileForm((f) => ({
-                  ...f,
-                  phone: e.target.value
-                }))
-                } />
-
+                <Input label="Full Name" value={profileForm.full_name}
+                  onChange={e => setProfileForm(f => ({ ...f, full_name: e.target.value }))} />
+                <Input label="Email Address" value={currentUser.email} disabled hint="Email cannot be changed" />
+                <Input label="Phone Number" value={profileForm.phone}
+                  onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input
-                  label="Date of Birth"
-                  value={member.date_of_birth}
-                  disabled />
-
+                  <Input label="Date of Birth" value={member.date_of_birth} disabled />
                   <Input label="Gender" value={member.gender} disabled />
                 </div>
                 <Button type="submit" variant="primary" loading={savingProfile}>
@@ -337,96 +157,35 @@ export function ProfilePage({
             </Card>
           </div>
           <Card>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
-              Account Info
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Account Info</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-700">
-                <span className="text-slate-500 dark:text-slate-400">
-                  Member ID
-                </span>
-                <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-                  #{member.member_id}
-                </span>
+                <span className="text-slate-500 dark:text-slate-400">Member ID</span>
+                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{member.id.slice(0, 8)}…</span>
               </div>
               <div className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-700">
-                <span className="text-slate-500 dark:text-slate-400">
-                  Username
-                </span>
-                <span className="font-mono text-slate-700 dark:text-slate-300">
-                  {currentUser.username}
-                </span>
+                <span className="text-slate-500 dark:text-slate-400">Email</span>
+                <span className="text-slate-700 dark:text-slate-300">{currentUser.email}</span>
               </div>
               <div className="flex justify-between py-2">
-                <span className="text-slate-500 dark:text-slate-400">
-                  Registered
-                </span>
-                <span className="text-slate-700 dark:text-slate-300">
-                  {new Date(member.registered_at).toLocaleDateString()}
-                </span>
+                <span className="text-slate-500 dark:text-slate-400">Registered</span>
+                <span className="text-slate-700 dark:text-slate-300">{new Date(member.created_at).toLocaleDateString()}</span>
               </div>
             </div>
           </Card>
         </div>
-      }
+      )}
 
-      {tab === 'goals' &&
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {tab === 'goals' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <Card>
-              <CardHeader
-              title="Add Fitness Goal"
-              subtitle="Set a new target for your fitness journey" />
-
+              <CardHeader title="Add Fitness Goal" subtitle="Set a new target for your fitness journey" />
               <form onSubmit={handleAddGoal} className="space-y-4">
-                <Dropdown
-                label="Goal Type"
-                value={goalForm.goal_type}
-                onChange={(v) =>
-                setGoalForm((f) => ({
-                  ...f,
-                  goal_type: v
-                }))
-                }
-                options={GOAL_OPTIONS}
-                placeholder="Select goal type" />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                  label="Target Value"
-                  type="number"
-                  placeholder="e.g. 65"
-                  value={goalForm.target_value}
-                  onChange={(e) =>
-                  setGoalForm((f) => ({
-                    ...f,
-                    target_value: e.target.value
-                  }))
-                  } />
-
-                  <Input
-                  label="Unit"
-                  placeholder="e.g. kg, min, reps"
-                  value={goalForm.target_unit}
-                  onChange={(e) =>
-                  setGoalForm((f) => ({
-                    ...f,
-                    target_unit: e.target.value
-                  }))
-                  } />
-
-                </div>
-                <Textarea
-                label="Description"
-                placeholder="Describe your goal..."
-                value={goalForm.description}
-                onChange={(e) =>
-                setGoalForm((f) => ({
-                  ...f,
-                  description: e.target.value
-                }))
-                } />
-
+                <Input label="Description *" placeholder="e.g. Run 5km without stopping"
+                  value={goalForm.description} onChange={e => setGoalForm(f => ({ ...f, description: e.target.value }))} />
+                <Input label="Target Value" placeholder="e.g. 5km, 70kg, 30 min"
+                  value={goalForm.target_value} onChange={e => setGoalForm(f => ({ ...f, target_value: e.target.value }))} />
                 <Button type="submit" variant="primary" loading={savingGoal}>
                   {savingGoal ? 'Adding…' : 'Add Goal'}
                 </Button>
@@ -434,106 +193,48 @@ export function ProfilePage({
             </Card>
           </div>
           <Card>
-              <CardHeader
-                title="Active Goals"
-                subtitle={`${goalsData.length} active`} />
-
-              {goalsData.length === 0 ? (
-                <div className="py-6 text-center">
-                  <TargetIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400 dark:text-slate-500">
-                    No active goals yet.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {goalsData.map((g) => (
-                      <div
-                        key={g.goal_id}
-                        className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
-
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                            {g.goal_type}
-                          </span>
-                          <Badge variant="teal">Active</Badge>
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {g.description}
-                        </div>
-                        {g.target_value > 0 && (
-                          <div className="text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1">
-                            Target: {g.target_value} {g.target_unit}
-                          </div>
-                        )}
+            <CardHeader title="My Goals" subtitle={`${goalsData.length} goal${goalsData.length !== 1 ? 's' : ''}`} />
+            {goalsData.length === 0 ? (
+              <div className="py-6 text-center">
+                <TargetIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400 dark:text-slate-500">No goals yet.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {goalsData.map(g => (
+                    <div key={g.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{g.description}</span>
+                        <Badge variant="teal">Active</Badge>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
-                    <Pagination
-                      currentPage={goalsCurrentPage}
-                      totalPages={goalsTotalPages}
-                      onPageChange={setGoalsPage}
-                      totalItems={goalsTotalItems}
-                      pageSize={PAGE_SIZE}
-                    />
-                  </div>
-                </>
-              )}
+                      {g.target_value && (
+                        <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">Target: {g.target_value}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
+                  <Pagination currentPage={goalsPage} totalPages={goalsTotalPages}
+                    onPageChange={setGoalsPage} totalItems={goalsTotalItems} pageSize={PAGE_SIZE} />
+                </div>
+              </>
+            )}
           </Card>
         </div>
-      }
+      )}
 
-      {tab === 'metrics' &&
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {tab === 'metrics' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <Card>
-              <CardHeader
-              title="Log Health Metric"
-              subtitle="Track your health over time" />
-
+              <CardHeader title="Log Health Metric" subtitle="Track your health over time" />
               <form onSubmit={handleAddMetric} className="space-y-4">
-                <Dropdown
-                label="Metric Type"
-                value={metricForm.metric_type}
-                onChange={(v) =>
-                setMetricForm((f) => ({
-                  ...f,
-                  metric_type: v,
-                  unit: METRIC_UNITS[v] || ''
-                }))
-                }
-                options={METRIC_OPTIONS}
-                placeholder="Select metric type" />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                  label="Value"
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g. 72.5"
-                  value={metricForm.value}
-                  onChange={(e) =>
-                  setMetricForm((f) => ({
-                    ...f,
-                    value: e.target.value
-                  }))
-                  } />
-
-                  <Input
-                  label="Unit"
-                  placeholder="e.g. kg"
-                  value={metricForm.unit}
-                  onChange={(e) =>
-                  setMetricForm((f) => ({
-                    ...f,
-                    unit: e.target.value
-                  }))
-                  } />
-
-                </div>
+                <Dropdown label="Metric Type" value={metricForm.metric_type}
+                  onChange={v => setMetricForm(f => ({ ...f, metric_type: v }))}
+                  options={METRIC_OPTIONS} placeholder="Select metric type" />
+                <Input label="Value" type="number" step="0.1" placeholder="e.g. 72.5"
+                  value={metricForm.value} onChange={e => setMetricForm(f => ({ ...f, value: e.target.value }))} />
                 <Button type="submit" variant="primary" loading={savingMetric}>
                   {savingMetric ? 'Recording…' : 'Record Metric'}
                 </Button>
@@ -541,60 +242,34 @@ export function ProfilePage({
             </Card>
           </div>
           <Card>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              Recent Health Metrics
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Recent Metrics</h3>
             {metricsData.length === 0 ? (
               <div className="py-4 text-center">
                 <HeartPulseIcon className="w-8 h-8 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-400 dark:text-slate-500">
-                  No metrics recorded yet.
-                </p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">No metrics recorded yet.</p>
               </div>
             ) : (
               <>
                 <div className="space-y-2 mb-4">
-                  {metricsData.map((metric) => (
-                    <div
-                      key={metric.metric_id}
-                      className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-700"
-                    >
+                  {metricsData.map(m => (
+                    <div key={m.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-700">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                          {metric.metric_type}
-                        </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {new Date(metric.recorded_at).toLocaleDateString()}
-                        </span>
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{m.metric_type}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(m.recorded_at).toLocaleDateString()}</span>
                       </div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        {metric.value} {metric.unit}
-                      </div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.metric_value}</div>
                     </div>
                   ))}
                 </div>
                 <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-700">
-                  <Pagination
-                    currentPage={metricsCurrentPage}
-                    totalPages={metricsTotalPages}
-                    onPageChange={setMetricsPage}
-                    totalItems={metricsTotalItems}
-                    pageSize={PAGE_SIZE}
-                  />
+                  <Pagination currentPage={metricsPage} totalPages={metricsTotalPages}
+                    onPageChange={setMetricsPage} totalItems={metricsTotalItems} pageSize={PAGE_SIZE} />
                 </div>
               </>
             )}
-            <div className="mt-4 p-3 bg-teal-50 dark:bg-teal-900/30 rounded-xl border border-teal-100 dark:border-teal-800">
-              <p className="text-xs text-teal-700 dark:text-teal-300 font-medium">
-                💡 Tip
-              </p>
-              <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">
-                Log metrics regularly to track your progress over time.
-              </p>
-            </div>
           </Card>
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 }

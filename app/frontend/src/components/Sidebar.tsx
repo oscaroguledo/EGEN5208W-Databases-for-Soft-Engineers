@@ -123,10 +123,10 @@ export function Sidebar({
     onNavigate(page);
     onMobileClose?.();
   };
-  // Get display name from email (username is stored as email)
-  const displayName = currentUser.username.includes('@') ?
-  currentUser.username.split('@')[0] :
-  currentUser.username;
+  // Display name from full_name or email prefix
+  const displayName = currentUser.full_name && currentUser.full_name !== currentUser.email
+    ? currentUser.full_name
+    : currentUser.email.split('@')[0];
   const sidebarContent =
   <aside
     className="h-full w-64 flex flex-col z-40"
@@ -196,7 +196,7 @@ export function Sidebar({
               {displayName}
             </div>
             <div className="text-slate-400 text-xs truncate">
-              {currentUser.username}
+              {currentUser.email}
             </div>
             <RoleBadge role={currentUser.role} />
           </div>

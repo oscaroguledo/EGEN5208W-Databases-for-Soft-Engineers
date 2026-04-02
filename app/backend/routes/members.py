@@ -98,8 +98,15 @@ async def list_fitness_goals(
     db: AsyncSession = Depends(get_db),
 ):
     target_id = member_id if current_user.role == UserRole.admin else current_user.id
-    goals = await MemberService.list_fitness_goals(db, target_id, skip, limit)
-    return APIResponse.success(data=[g.to_dict() for g in goals], message="Fitness goals retrieved.")
+    goals, total = await MemberService.list_fitness_goals(db, target_id, skip, limit)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    return APIResponse(
+        status="success",
+        message="Fitness goals retrieved.",
+        data=[g.to_dict() for g in goals],
+        pagination=Pagination(total=total, page=(skip // limit) + 1, size=limit, total_pages=total_pages),
+        status_code=200,
+    )
 
 
 @router.get("/health-history", response_model=APIResponse[list])
@@ -110,10 +117,17 @@ async def get_health_history(
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db),
 ):
-    metrics = await MemberService.get_health_metrics(
-        db=db, member_id=current_user.id, metric_type=metric_type, limit=limit
+    metrics, total = await MemberService.get_health_metrics(
+        db=db, member_id=current_user.id, metric_type=metric_type, skip=skip, limit=limit
     )
-    return APIResponse.success(data=[m.to_dict() for m in metrics], message="Health history retrieved.")
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    return APIResponse(
+        status="success",
+        message="Health history retrieved.",
+        data=[m.to_dict() for m in metrics],
+        pagination=Pagination(total=total, page=(skip // limit) + 1, size=limit, total_pages=total_pages),
+        status_code=200,
+    )
 
 
 @router.post("/health-metrics", response_model=APIResponse[dict])
@@ -144,8 +158,15 @@ async def list_available_classes(
     date_obj = None
     if class_date:
         date_obj = datetime.strptime(class_date, "%Y-%m-%d").date()
-    classes = await MemberService.list_available_classes(db=db, skip=skip, limit=limit, class_date=date_obj)
-    return APIResponse.success(data=[c.to_dict() for c in classes], message="Available classes retrieved.")
+    classes, total = await MemberService.list_available_classes(db=db, skip=skip, limit=limit, class_date=date_obj)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    return APIResponse(
+        status="success",
+        message="Available classes retrieved.",
+        data=[c.to_dict() for c in classes],
+        pagination=Pagination(total=total, page=(skip // limit) + 1, size=limit, total_pages=total_pages),
+        status_code=200,
+    )
 
 
 @router.post("/enroll-class/{class_id}", response_model=APIResponse[dict])
@@ -221,15 +242,6 @@ async def get_member_dashboard(
 ):
     schedule = await MemberService.get_dashboard_schedule(db=db, member_id=current_user.id, days_ahead=days_ahead)
     return APIResponse.success(data=schedule, message="Dashboard data retrieved.")
-
-
-@router.get("/dashboard-optimized", response_model=APIResponse[dict])
-async def get_member_dashboard_optimized(
-    current_user: User = Depends(require_member),
-    db: AsyncSession = Depends(get_db),
-):
-    dashboard = await MemberService.get_dashboard_with_view(db=db, member_id=current_user.id)
-    return APIResponse.success(data=dashboard, message="Dashboard data retrieved (optimized).")
 
 
 @router.get("/list", response_model=APIResponse[list])

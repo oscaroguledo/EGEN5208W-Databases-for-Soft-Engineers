@@ -39,7 +39,7 @@ git clone <repository-url>
 cd EGEN5208W-Databases-for-Soft-Engineers
 
 # 2. Start all services
-docker-compose up -d
+docker-compose up --build
 
 # 3. Monitor startup (optional)
 docker-compose logs -f

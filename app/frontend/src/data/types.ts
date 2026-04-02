@@ -1,123 +1,137 @@
-// Shared types for the FitClub app
+// Shared types for the FitClub app — aligned with backend API responses
 
 export type UserRole = 'member' | 'trainer' | 'admin';
 export type Gender = 'male' | 'female' | 'other';
 export type ClassStatus = 'scheduled' | 'full' | 'cancelled' | 'completed';
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled';
-export type EquipmentStatus = 'operational' | 'under repair' | 'out of service';
+export type EquipmentStatus = 'operational' | 'under_repair' | 'out_of_service';
 
+// ── Auth / User ────────────────────────────────────────────────────────────
+// Returned by /auth/login (data.user) and /auth/me (data)
 export interface User {
-  user_id: number;
-  username: string;
-  password: string;
+  id: string;          // UUID
+  email: string;
   role: UserRole;
-  created_at: string;
+  full_name: string;
 }
 
+// ── Member ─────────────────────────────────────────────────────────────────
+// Returned by /members/me, /members/register, /members/list
 export interface Member {
-  member_id: number;
-  user_id: number;
+  id: string;          // UUID — same as the linked user id
   full_name: string;
-  email: string;
   date_of_birth: string;
   gender: Gender;
   phone: string;
-  registered_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
+// ── Trainer ────────────────────────────────────────────────────────────────
+// Returned by /trainers/list
 export interface Trainer {
-  trainer_id: number;
-  user_id: number;
+  id: string;          // UUID
   full_name: string;
-  email: string;
-  specialization: string;
-  phone: string;
+  created_at: string;
+  updated_at: string;
 }
 
+// ── Room ───────────────────────────────────────────────────────────────────
+// Not yet returned by the API — kept for local use / future endpoint
 export interface Room {
-  room_id: number;
-  room_name: string;
+  id: string;
+  name: string;
   capacity: number;
-  location: string;
 }
 
+// ── Fitness Goal ───────────────────────────────────────────────────────────
+// Returned by /members/goals/list, /members/goals (POST)
 export interface FitnessGoal {
-  goal_id: number;
-  member_id: number;
-  goal_type: string;
-  target_value: number;
-  target_unit: string;
+  id: string;          // UUID
+  member_id: string;
   description: string;
-  is_active: boolean;
+  target_value: string | null;   // stored as string in DB
   created_at: string;
 }
 
+// ── Health Metric ──────────────────────────────────────────────────────────
+// Returned by /members/health-history
 export interface HealthMetric {
-  metric_id: number;
-  member_id: number;
+  id: string;          // UUID
+  member_id: string;
   metric_type: string;
-  value: number;
-  unit: string;
+  metric_value: number;
   recorded_at: string;
 }
 
+// ── Trainer Availability ───────────────────────────────────────────────────
+// Returned by /trainers/schedule (data.availability[])
 export interface TrainerAvailability {
-  availability_id: number;
-  trainer_id: number;
+  id: string;          // UUID
+  trainer_id: string;
   available_date: string;
-  start_time: string;
-  end_time: string;
+  start_at: string;
+  end_at: string;
 }
 
+// ── Group Class ────────────────────────────────────────────────────────────
+// Returned by /members/classes/available, /admin/classes (POST)
 export interface GroupClass {
-  class_id: number;
-  class_name: string;
-  trainer_id: number;
-  room_id: number;
+  id: string;          // UUID
+  name: string;
+  trainer_id: string;
+  room_id: string;
   class_date: string;
   start_time: string;
   end_time: string;
   max_capacity: number;
-  current_enrollment: number;
-  status: ClassStatus;
+  created_at: string;
 }
 
-export interface ClassRegistration {
-  registration_id: number;
-  member_id: number;
-  class_id: number;
+// ── Class Enrollment ───────────────────────────────────────────────────────
+// Returned by /members/enroll-class/{id} (POST)
+export interface ClassEnrollment {
+  enrollment_id: string;
+  member_id: string;
+  class_id: string;
   registered_at: string;
-  attended: boolean;
 }
 
-export interface PersonalSession {
-  session_id: number;
-  member_id: number;
-  trainer_id: number;
-  room_id: number;
+// ── Training Session ───────────────────────────────────────────────────────
+// Returned by /members/book-session, /admin/sessions/list
+export interface TrainingSession {
+  id: string;          // UUID
+  trainer_id: string;
+  member_id: string;
+  room_id: string;
   session_date: string;
   start_time: string;
   end_time: string;
   status: SessionStatus;
-  notes: string;
   created_at: string;
 }
 
+// ── Equipment ──────────────────────────────────────────────────────────────
+// Returned by /admin/equipment, /admin/equipment/list
 export interface Equipment {
-  equipment_id: number;
+  id: string;          // UUID
+  room_id: string;
   equipment_name: string;
-  room_id: number;
   status: EquipmentStatus;
   maintenance_notes?: string;
   created_at: string;
   updated_at: string;
 }
 
-export function timesOverlap(
-s1: string,
-e1: string,
-s2: string,
-e2: string)
-: boolean {
+// ── Pagination ─────────────────────────────────────────────────────────────
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  size: number;
+  total_pages: number;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+export function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
   return s1 < e2 && s2 < e1;
 }

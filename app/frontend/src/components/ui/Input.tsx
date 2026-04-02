@@ -40,14 +40,6 @@ export function Input({
   const inputType = showPasswordToggle && props.type === 'password' 
     ? (showPassword ? 'text' : 'password')
     : props.type;
-  
-  console.log('Input type logic:', {
-    showPasswordToggle,
-    propsType: props.type,
-    showPassword,
-    finalType: inputType,
-    inputValue: props.value
-  });
 
   // Force re-render when type changes to ensure value is preserved
   const inputRef = React.useRef<HTMLInputElement>(null);

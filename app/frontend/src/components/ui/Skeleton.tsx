@@ -247,6 +247,39 @@ export function RoomBookingSkeleton() {
     </div>);
 
 }
+export function ClassesSkeleton() {
+  return (
+    <div>
+      <div className="mb-6 space-y-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <Skeleton className="h-10 w-80 mb-6 rounded-lg" />
+      <div className="space-y-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-5 w-48" />
+                <div className="flex gap-4">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Skeleton className="h-9 w-24 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 export function EquipmentSkeleton() {
   return (
     <div>
@@ -263,6 +296,6 @@ export function EquipmentSkeleton() {
         <StatCardSkeleton />
       </div>
       <TableSkeleton rows={6} cols={7} />
-    </div>);
-
+    </div>
+  );
 }

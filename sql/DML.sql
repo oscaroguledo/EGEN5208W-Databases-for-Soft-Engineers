@@ -3,13 +3,14 @@
 -- This script populates the database with sample data for testing all operations
 
 -- Insert Sample Users
+-- password123 hashed with bcrypt (cost 12)
 INSERT INTO users (email, password, role) VALUES
-('admin@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'admin'),
-('trainer1@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'trainer'),
-('trainer2@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'trainer'),
-('member1@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'member'),
-('member2@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'member'),
-('member3@gym.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'member');
+('admin@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'admin'),
+('trainer1@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'trainer'),
+('trainer2@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'trainer'),
+('member1@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'member'),
+('member2@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'member'),
+('member3@gym.com', '$2b$12$LdD/AtGc9kUGp7TktTs0SOr.RVgtbQda9EorefnQMKL6K.39/pJIG', 'member');
 
 -- Insert Admin Staff
 INSERT INTO admin_staff (id, full_name) VALUES

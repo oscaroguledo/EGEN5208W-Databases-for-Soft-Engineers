@@ -1,181 +1,106 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CalendarIcon, UsersIcon, UserIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/useServerPagination';
 import { StatusBadge } from '@/components/ui/Badge';
 import { ScheduleSkeleton } from '@/components/ui/Skeleton';
-import {
-  User,
-  Trainer,
-  PersonalSession,
-  GroupClass,
-  Member,
-  Room } from
-'@/data/types';
+import { User, Trainer, TrainingSession, GroupClass, Member, Room } from '@/data/types';
+import * as trainersApi from '@/apis/trainers';
+
 interface SchedulePageProps {
   currentUser: User;
   trainers: Trainer[];
-  personalSessions: PersonalSession[];
+  trainingSessions: TrainingSession[];
   groupClasses: GroupClass[];
   members: Member[];
   rooms: Room[];
 }
-export function SchedulePage({
-  currentUser,
-  trainers,
-  personalSessions,
-  groupClasses,
-  members,
-  rooms
-}: SchedulePageProps) {
+
+export function SchedulePage({ currentUser, members, rooms }: SchedulePageProps) {
   const [loading, setLoading] = useState(true);
+  const [trainer, setTrainer] = useState<Trainer | null>(null);
+  const [upcomingSessions, setUpcomingSessions] = useState<TrainingSession[]>([]);
+  const [upcomingClasses, setUpcomingClasses] = useState<GroupClass[]>([]);
+
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 450);
-    return () => clearTimeout(t);
-  }, []);
-  const trainer = trainers.find((t) => t.user_id === currentUser.user_id);
-  const today = new Date().toISOString().split('T')[0];
-  const upcomingSessions = trainer
-    ? personalSessions
-        .filter((s) => s.trainer_id === trainer.trainer_id && s.session_date >= today && s.status === 'scheduled')
-        .sort((a, b) => a.session_date.localeCompare(b.session_date) || a.start_time.localeCompare(b.start_time))
-    : [];
+    let mounted = true;
+    (async () => {
+      try {
+        const [trainerData, scheduleData] = await Promise.all([
+          trainersApi.getTrainerMe(),
+          trainersApi.getSchedule(30),
+        ]);
+        if (!mounted) return;
+        if (trainerData) setTrainer(trainerData as Trainer);
+        if (scheduleData) {
+          setUpcomingSessions((scheduleData as any).upcoming_sessions ?? []);
+          setUpcomingClasses((scheduleData as any).upcoming_classes ?? []);
+        }
+      } catch {
+        // handled by empty state
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [currentUser.id]);
 
-  const upcomingClasses = trainer
-    ? groupClasses
-        .filter((c) => c.trainer_id === trainer.trainer_id && c.class_date >= today && c.status !== 'cancelled')
-        .sort((a, b) => a.class_date.localeCompare(b.class_date) || a.start_time.localeCompare(b.start_time))
-    : [];
-
-  // Server-side pagination for sessions
   const fetchSessions = useCallback(async (skip: number, limit: number) => {
-    // Filter sessions for current trainer
-    const filtered = trainer
-      ? personalSessions
-          .filter((s) => s.trainer_id === trainer.trainer_id && s.session_date >= today && s.status === 'scheduled')
-          .sort((a, b) => a.session_date.localeCompare(b.session_date) || a.start_time.localeCompare(b.start_time))
-      : [];
-    
-    // Simulate server-side pagination
-    const page = Math.floor(skip / limit) + 1;
-    const paginatedData = filtered.slice(skip, skip + limit);
+    const filtered = upcomingSessions.slice(skip, skip + limit);
     return {
-      status: 'success',
-      message: 'Sessions retrieved successfully',
-      status_code: 200,
-      data: paginatedData,
-      pagination: {
-        total: filtered.length,
-        page,
-        size: limit,
-        total_pages: Math.ceil(filtered.length / limit)
-      }
+      status: 'success', message: '', status_code: 200,
+      data: filtered,
+      pagination: { total: upcomingSessions.length, page: Math.floor(skip / limit) + 1, size: limit, total_pages: Math.ceil(upcomingSessions.length / limit) || 1 },
     };
-  }, [trainer, personalSessions, today]);
+  }, [upcomingSessions]);
 
-  const {
-    data: sessionsData,
-    currentPage: sessionsCurrentPage,
-    totalPages: sessionsTotalPages,
-    totalItems: sessionsTotalItems,
-    setPage: setSessionsPage,
-  } = usePagination<PersonalSession>(fetchSessions, { pageSize: 6 });
-
-  // Server-side pagination for classes
   const fetchClasses = useCallback(async (skip: number, limit: number) => {
-    // Filter classes for current trainer
-    const filtered = trainer
-      ? groupClasses
-          .filter((c) => c.trainer_id === trainer.trainer_id && c.class_date >= today && c.status !== 'cancelled')
-          .sort((a, b) => a.class_date.localeCompare(b.class_date) || a.start_time.localeCompare(b.start_time))
-      : [];
-    
-    // Simulate server-side pagination
-    const page = Math.floor(skip / limit) + 1;
-    const paginatedData = filtered.slice(skip, skip + limit);
+    const filtered = upcomingClasses.slice(skip, skip + limit);
     return {
-      status: 'success',
-      message: 'Classes retrieved successfully',
-      status_code: 200,
-      data: paginatedData,
-      pagination: {
-        total: filtered.length,
-        page,
-        size: limit,
-        total_pages: Math.ceil(filtered.length / limit)
-      }
+      status: 'success', message: '', status_code: 200,
+      data: filtered,
+      pagination: { total: upcomingClasses.length, page: Math.floor(skip / limit) + 1, size: limit, total_pages: Math.ceil(upcomingClasses.length / limit) || 1 },
     };
-  }, [trainer, groupClasses, today]);
+  }, [upcomingClasses]);
 
-  const {
-    data: classesData,
-    currentPage: classesCurrentPage,
-    totalPages: classesTotalPages,
-    totalItems: classesTotalItems,
-    setPage: setClassesPage,
-  } = usePagination<GroupClass>(fetchClasses, { pageSize: 6 });
+  const { data: sessionsData, currentPage: sessionsPage, totalPages: sessionsTotalPages, totalItems: sessionsTotalItems, setPage: setSessionsPage } =
+    usePagination<TrainingSession>(fetchSessions, { pageSize: 6 });
 
-  if (!trainer)
-    return <div className="text-slate-500 dark:text-slate-400">Trainer profile not found.</div>;
+  const { data: classesData, currentPage: classesPage, totalPages: classesTotalPages, totalItems: classesTotalItems, setPage: setClassesPage } =
+    usePagination<GroupClass>(fetchClasses, { pageSize: 6 });
 
   if (loading) return <ScheduleSkeleton />;
+  if (!trainer) return <div className="text-slate-500 dark:text-slate-400">Trainer profile not found.</div>;
+
   const formatDate = (d: string) =>
-  new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric'
-  });
+    new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          My Schedule
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Upcoming sessions and classes
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">My Schedule</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Upcoming sessions and classes</p>
       </div>
 
       {/* Trainer banner */}
-      <div
-        className="mb-6 rounded-xl overflow-hidden border border-teal-200 dark:border-teal-800"
-        style={{
-          background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
-        }}>
-
+      <div className="mb-6 rounded-xl overflow-hidden border border-teal-200 dark:border-teal-800"
+        style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0f766e 100%)' }}>
         <div className="px-4 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
             {trainer.full_name.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-white text-base">
-              {trainer.full_name}
-            </div>
-            <div className="text-teal-100 text-sm">
-              {trainer.specialization}
-            </div>
+            <div className="font-semibold text-white text-base">{trainer.full_name}</div>
           </div>
           <div className="text-left sm:text-right flex-shrink-0">
-            <div className="text-3xl font-bold text-white">
-              {upcomingSessions.length + upcomingClasses.length}
-            </div>
+            <div className="text-3xl font-bold text-white">{upcomingSessions.length + upcomingClasses.length}</div>
             <div className="text-teal-100 text-xs">Upcoming assignments</div>
           </div>
         </div>
         <div className="px-4 sm:px-6 py-2 bg-black/10 flex gap-6">
-          <div className="text-xs text-teal-100">
-            <span className="font-semibold text-white">
-              {upcomingSessions.length}
-            </span>{' '}
-            personal sessions
-          </div>
-          <div className="text-xs text-teal-100">
-            <span className="font-semibold text-white">
-              {upcomingClasses.length}
-            </span>{' '}
-            group classes
-          </div>
+          <div className="text-xs text-teal-100"><span className="font-semibold text-white">{upcomingSessions.length}</span> personal sessions</div>
+          <div className="text-xs text-teal-100"><span className="font-semibold text-white">{upcomingClasses.length}</span> group classes</div>
         </div>
       </div>
 
@@ -184,8 +109,7 @@ export function SchedulePage({
         <Card padding="none">
           <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700">
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserIcon className="w-4 h-4 text-teal-600" />
-              Personal Training Sessions
+              <UserIcon className="w-4 h-4 text-teal-600" /> Personal Training Sessions
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{sessionsTotalItems} upcoming</p>
           </div>
@@ -195,53 +119,29 @@ export function SchedulePage({
               <p className="text-slate-400 dark:text-slate-500 text-sm">No upcoming personal sessions.</p>
             </div>
           ) : (
-
-          <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {sessionsData.map((s: PersonalSession) => {
-              const member = members.find((m) => m.member_id === s.member_id);
-              const room = rooms.find((r) => r.room_id === s.room_id);
-              return (
-                <div
-                  key={s.session_id}
-                  className="px-4 sm:px-6 py-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
-
+            <div className="divide-y divide-slate-50 dark:divide-slate-700">
+              {sessionsData.map(s => {
+                const member = members.find(m => m.id === s.member_id);
+                const room = rooms.find(r => r.id === s.room_id);
+                return (
+                  <div key={s.id} className="px-4 sm:px-6 py-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
                     <div className="flex items-start justify-between mb-1">
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        {formatDate(s.session_date)}
-                      </div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatDate(s.session_date)}</div>
                       <StatusBadge status={s.status} />
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                      {s.start_time} – {s.end_time}
-                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{s.start_time} – {s.end_time}</div>
                     <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
-                      <span>
-                        <span className="font-medium">Member:</span>{' '}
-                        {member?.full_name}
-                      </span>
-                      <span>
-                        <span className="font-medium">Room:</span>{' '}
-                        {room?.room_name}
-                      </span>
+                      {member && <span><span className="font-medium">Member:</span> {member.full_name}</span>}
+                      {room && <span><span className="font-medium">Room:</span> {room.name}</span>}
                     </div>
-                    {s.notes &&
-                  <div className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 italic">
-                        "{s.notes}"
-                      </div>
-                  }
-                  </div>);
-
-            })}
+                  </div>
+                );
+              })}
             </div>
           )}
           <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-            <Pagination
-              currentPage={sessionsCurrentPage}
-              totalPages={sessionsTotalPages}
-              onPageChange={setSessionsPage}
-              totalItems={sessionsTotalItems}
-              pageSize={6}
-            />
+            <Pagination currentPage={sessionsPage} totalPages={sessionsTotalPages}
+              onPageChange={setSessionsPage} totalItems={sessionsTotalItems} pageSize={6} />
           </div>
         </Card>
 
@@ -249,8 +149,7 @@ export function SchedulePage({
         <Card padding="none">
           <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700">
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UsersIcon className="w-4 h-4 text-blue-600" />
-              Group Fitness Classes
+              <UsersIcon className="w-4 h-4 text-blue-600" /> Group Fitness Classes
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{classesTotalItems} upcoming</p>
           </div>
@@ -261,33 +160,25 @@ export function SchedulePage({
             </div>
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-700">
-              {classesData.map((c: GroupClass) => {
-                const room = rooms.find((r) => r.room_id === c.room_id);
-                const fillPct = Math.round((c.current_enrollment / c.max_capacity) * 100);
+              {classesData.map(c => {
+                const room = rooms.find(r => r.id === c.room_id);
                 return (
-                  <div key={c.class_id} className="px-4 sm:px-6 py-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                    <div className="flex items-start justify-between mb-1">
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{c.class_name}</div>
-                      <StatusBadge status={c.status} />
-                    </div>
+                  <div key={c.id} className="px-4 sm:px-6 py-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">{c.name}</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{formatDate(c.class_date)} · {c.start_time} – {c.end_time}</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-300 mb-2.5"><span className="font-medium">Room:</span> {room?.room_name}</div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-1.5">
-                        <div className={`h-1.5 rounded-full transition-all ${fillPct >= 100 ? 'bg-red-400' : fillPct >= 75 ? 'bg-amber-400' : 'bg-teal-400'}`} style={{ width: `${Math.min(fillPct, 100)}%` }} />
-                      </div>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{c.current_enrollment}/{c.max_capacity}</span>
-                    </div>
+                    {room && <div className="text-xs text-slate-600 dark:text-slate-300"><span className="font-medium">Room:</span> {room.name}</div>}
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Max: {c.max_capacity}</div>
                   </div>
                 );
               })}
             </div>
           )}
           <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-            <Pagination currentPage={classesCurrentPage} totalPages={classesTotalPages} onPageChange={setClassesPage} totalItems={classesTotalItems} pageSize={6} />
+            <Pagination currentPage={classesPage} totalPages={classesTotalPages}
+              onPageChange={setClassesPage} totalItems={classesTotalItems} pageSize={6} />
           </div>
         </Card>
       </div>
-    </div>);
-
+    </div>
+  );
 }

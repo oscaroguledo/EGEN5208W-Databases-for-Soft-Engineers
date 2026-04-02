@@ -221,6 +221,18 @@ class AdminStaffService:
         ]
 
     @staticmethod
+    async def list_rooms(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Tuple[List[Room], int]:
+        base_q = select(Room)
+        count_q = select(func.count(Room.id))
+        total = (await db.execute(count_q)).scalar()
+        items = (await db.execute(base_q.offset(skip).limit(limit))).scalars().all()
+        return items, total
+
+    @staticmethod
     async def create_admin(
         db: AsyncSession,
         email: str,

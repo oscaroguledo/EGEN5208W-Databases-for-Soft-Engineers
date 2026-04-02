@@ -7,12 +7,11 @@ import { Input } from '@/components/ui/Input';
 import { User } from '@/data/types';
 import { login } from '@/apis/auth';
 interface LoginPageProps {
-  users: User[];
   onLogin: (user: User) => void;
   onGoRegister: () => void;
 }
 
-export function LoginPage({ users, onLogin, onGoRegister }: LoginPageProps) {
+export function LoginPage({ onLogin, onGoRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
