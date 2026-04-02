@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
+from pydantic import BaseModel
 
 from core.db import get_db
 from core.auth import require_admin
@@ -13,31 +14,37 @@ from models.users.user import User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+class CreateClassRequest(BaseModel):
+    """Create class request schema"""
+    name: str
+    trainer_id: UUID
+    room_id: UUID
+    class_date: str  # "YYYY-MM-DD"
+    start_time: str  # "HH:MM"
+    end_time: str  # "HH:MM"
+    max_capacity: int = 20
+
+
 @router.post("/classes", response_model=APIResponse[dict])
 async def create_class(
-    name: str,
-    trainer_id: UUID,
-    room_id: UUID,
-    class_date: str,
-    start_time: str,
-    end_time: str,
-    max_capacity: int = 20,
+    data: CreateClassRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new group fitness class"""
     from datetime import datetime, time
     
-    date_obj = datetime.strptime(class_date, "%Y-%m-%d").date()
-    start_time_obj = datetime.strptime(start_time, "%H:%M").time()
-    end_time_obj = datetime.strptime(end_time, "%H:%M").time()
+    date_obj = datetime.strptime(data.class_date, "%Y-%m-%d").date()
+    start_time_obj = datetime.strptime(data.start_time, "%H:%M").time()
+    end_time_obj = datetime.strptime(data.end_time, "%H:%M").time()
     
     try:
         new_class = await AdminStaffService.schedule_class_with_room(
             db=db,
-            class_name=name,
-            trainer_id=trainer_id,
-            room_id=room_id,
+            class_name=data.name,
+            trainer_id=data.trainer_id,
+            room_id=data.room_id,
             class_date=date_obj,
             start_time=start_time_obj,
             end_time=end_time_obj
@@ -55,10 +62,15 @@ async def create_class(
             detail=str(e)
         )
 
+class AssignRoomRequest(BaseModel):
+    """Assign room to session request"""
+    room_id: UUID
+
+
 @router.put("/sessions/{session_id}/room", response_model=APIResponse[dict])
 async def assign_room_to_session(
     session_id: UUID,
-    room_id: UUID,
+    data: AssignRoomRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -67,13 +79,13 @@ async def assign_room_to_session(
         session = await AdminStaffService.book_room_for_session(
             db=db,
             session_id=session_id,
-            room_id=room_id
+            room_id=data.room_id
         )
         
         return APIResponse(
             status="success",
             message="Room assigned to session",
-            data={"session_id": str(session.id), "room_id": str(room_id)},
+            data={"session_id": str(session.id), "room_id": str(data.room_id)},
             status_code=200
         )
     except ValueError as e:
@@ -163,11 +175,16 @@ async def list_equipment_paginated(
         status_code=200
     )
 
+class EquipmentStatusRequest(BaseModel):
+    """Equipment status update request"""
+    status: str
+    notes: Optional[str] = None
+
+
 @router.put("/equipment/{equipment_id}/status", response_model=APIResponse[dict])
 async def update_equipment_status(
     equipment_id: UUID,
-    status: str,
-    notes: str = None,
+    data: EquipmentStatusRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -175,12 +192,12 @@ async def update_equipment_status(
     from models.equipments import EquipmentStatus
     
     try:
-        status_enum = EquipmentStatus(status)
+        status_enum = EquipmentStatus(data.status)
         equipment = await AdminStaffService.update_equipment_maintenance(
             db=db,
             equipment_id=equipment_id,
             status=status_enum,
-            notes=notes
+            notes=data.notes
         )
         
         if not equipment:
@@ -192,7 +209,7 @@ async def update_equipment_status(
         return APIResponse(
             status="success",
             message="Equipment status updated",
-            data={"equipment_id": str(equipment.id), "status": status},
+            data={"equipment_id": str(equipment.id), "status": data.status},
             status_code=200
         )
     except ValueError:
@@ -221,12 +238,17 @@ async def get_equipment_status_options(
         status_code=200
     )
 
+class CreateEquipmentRequest(BaseModel):
+    """Create equipment request"""
+    equipment_name: str
+    room_id: UUID
+    status: str = "operational"
+    notes: Optional[str] = None
+
+
 @router.post("/equipment", response_model=APIResponse[dict])
 async def create_equipment(
-    equipment_name: str,
-    room_id: UUID,
-    status: str = "operational",
-    notes: str = None,
+    data: CreateEquipmentRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -235,20 +257,20 @@ async def create_equipment(
     from services.equipments import EquipmentService
     
     try:
-        status_enum = EquipmentStatus(status)
+        status_enum = EquipmentStatus(data.status)
         new_equipment = await EquipmentService.create_equipment(
             db=db,
-            room_id=room_id,
-            equipment_name=equipment_name,
+            room_id=data.room_id,
+            equipment_name=data.equipment_name,
             status=status_enum
         )
         
         # Update notes if provided
-        if notes:
+        if data.notes:
             await EquipmentService.update_equipment(
                 db=db,
                 equipment_id=new_equipment.id,
-                maintenance_notes=notes
+                maintenance_notes=data.notes
             )
         
         return APIResponse(
@@ -266,13 +288,18 @@ async def create_equipment(
             detail=str(e)
         )
 
+class UpdateEquipmentRequest(BaseModel):
+    """Update equipment request"""
+    equipment_name: Optional[str] = None
+    room_id: Optional[UUID] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
 @router.put("/equipment/{equipment_id}", response_model=APIResponse[dict])
 async def update_equipment(
     equipment_id: UUID,
-    equipment_name: str = None,
-    room_id: UUID = None,
-    status: str = None,
-    notes: str = None,
+    data: UpdateEquipmentRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -283,15 +310,15 @@ async def update_equipment(
     try:
         # Build update data dict
         update_data = {}
-        if equipment_name:
-            update_data["equipment_name"] = equipment_name
-        if room_id:
-            update_data["room_id"] = room_id
-        if status:
-            status_enum = EquipmentStatus(status)
+        if data.equipment_name:
+            update_data["equipment_name"] = data.equipment_name
+        if data.room_id:
+            update_data["room_id"] = data.room_id
+        if data.status:
+            status_enum = EquipmentStatus(data.status)
             update_data["status"] = status_enum
-        if notes is not None:
-            update_data["maintenance_notes"] = notes
+        if data.notes is not None:
+            update_data["maintenance_notes"] = data.notes
         if update_data:
             update_data["updated_at"] = datetime.utcnow()
         

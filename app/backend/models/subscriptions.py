@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import DateTime
 from datetime import datetime
 import uuid
+import enum
 
 class SubscriptionStatus(enum.Enum):
     active = "active"

@@ -1,249 +1,224 @@
+"""
+Authentication routes.
+
+POST /auth/login        → returns access_token + refresh_token
+POST /auth/logout       → blacklists the current access token
+POST /auth/refresh      → exchanges a valid refresh token for a new access token
+POST /auth/logout-all   → blacklists the current access token (stateless: can't
+                          revoke all devices without a DB; blacklists current one)
+GET  /auth/me           → returns user info from the JWT (no DB hit needed)
+GET  /auth/verify       → returns whether the supplied token is valid
+"""
+
+from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import uuid as _uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
-import uuid
 
 from core.db import get_db
 from core.response import APIResponse
-from core.sessions import (
-    create_user_session, 
-    get_session, 
-    delete_session,
-    delete_all_user_sessions,
-    extend_session,
-    session_store,
-    blacklist_token,
-    is_token_blacklisted
+from core.jwt import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    decode_refresh_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+from core.sessions import token_blacklist
+from core.auth import get_user_from_jwt, security
 from services.users.user import UserService
 from models.users.user import User, UserRole
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
-# Security scheme for session-based auth
-security = HTTPBearer(auto_error=False)
+
+# ── request / response schemas ─────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
-# Session validation dependencies
-async def get_current_user_from_session(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """
-    Dependency to get current user from session token.
-    Validates session and returns user object.
-    """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Please provide a session token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    session = await get_session(credentials.credentials)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session. Please login again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Get user from database
-    user = await UserService.get_user(db, uuid.UUID(session.user_id))
-    if not user:
-        # User no longer exists, clear session
-        await delete_session(session.id)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found. Session cleared.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
-async def get_optional_user_from_session(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
-) -> Optional[User]:
-    """
-    Dependency to optionally get current user from session.
-    Returns None if no valid session.
-    """
-    if not credentials:
-        return None
-    
-    session = await get_session(credentials.credentials)
-    if not session:
-        return None
-    
-    user = await UserService.get_user(db, uuid.UUID(session.user_id))
-    return user
+# ── helpers ────────────────────────────────────────────────────────────────
+
+def _user_dict(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "role": user.role.value,
+        "full_name": getattr(user, "full_name", user.email),
+    }
+
+
+# ── routes ─────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=APIResponse[dict])
 async def login(
-    email: str,
-    password: str,
-    db: AsyncSession = Depends(get_db)
+    login_data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Authenticate user and create session"""
-    try:
-        # Authenticate user
-        user = await UserService.authenticate_user(db, email, password)
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Create production-ready session with TTL
-        session = await create_user_session(
-            user_id=str(user.id),
-            email=user.email,
-            role=user.role.value,
-            ttl_minutes=30,  # 30 minute session
-            extra_data={
-                "full_name": getattr(user, 'full_name', email),
-                "login_time": datetime.utcnow().isoformat()
-            }
-        )
-        
-        return APIResponse.success({
-            "session_id": session.id,
-            "expires_at": session.expires_at.isoformat(),
-            "user": {
-                "id": str(user.id),
-                "email": user.email,
-                "role": user.role.value,
-                "full_name": getattr(user, 'full_name', email)
-            }
-        })
-        
-    except Exception as e:
+    """
+    Authenticate with email + password.
+    Returns a short-lived access token and a long-lived refresh token.
+    """
+    user = await UserService.authenticate_user(db, login_data.email, login_data.password)
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
         )
+
+    access_token  = create_access_token(str(user.id), user.email, user.role.value)
+    refresh_token = create_refresh_token(str(user.id), user.email, user.role.value)
+
+    return APIResponse.success(
+        data={
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
+            "user": _user_dict(user),
+        },
+        message="Login successful.",
+    )
+
 
 @router.post("/logout", response_model=APIResponse[dict])
 async def logout(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    """Logout user and clear session - Production implementation"""
+    """
+    Revoke the current access token by adding it to the blacklist.
+    The client should also discard the refresh token locally.
+    """
     if not credentials:
-        return APIResponse.success({
-            "message": "No active session found"
-        })
-    
-    session_id = credentials.credentials
-    session = await get_session(session_id)
-    
-    if session:
-        # Clear the session from store
-        deleted = await delete_session(session_id)
-        if deleted:
-            return APIResponse.success({
-                "message": "Logged out successfully",
-                "session_cleared": True,
-                "user_id": session.user_id
-            })
-    
-    return APIResponse.success({
-        "message": "Session already expired or invalid",
-        "session_cleared": False
-    })
+        return APIResponse.success(data={"revoked": False}, message="No token provided.")
 
-@router.post("/logout-token", response_model=APIResponse[dict])
-async def logout_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Logout user and clear session (alias for /logout)"""
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No session token provided"
-        )
-    
-    session_id = credentials.credentials
-    deleted = await delete_session(session_id)
-    
-    return APIResponse.success({
-        "message": "Successfully logged out" if deleted else "Session already expired",
-        "session_cleared": deleted
-    })
+    token = credentials.credentials
+    try:
+        payload = decode_access_token(token)
+        exp = payload.get("exp")
+        expires_at = datetime.utcfromtimestamp(exp) if exp else datetime.utcnow()
+        await token_blacklist.add(token, expires_at)
+    except HTTPException:
+        pass  # already invalid — that's fine
+
+    return APIResponse.success(data={"revoked": True}, message="Logged out successfully.")
+
 
 @router.post("/refresh", response_model=APIResponse[dict])
-async def refresh_session_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+async def refresh(
+    body: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Refresh session expiration time"""
-    if not credentials:
+    """
+    Exchange a valid refresh token for a new access token.
+    The refresh token itself is NOT rotated (stateless design).
+    If you need rotation, blacklist the old refresh token here and issue a new one.
+    """
+    payload = decode_refresh_token(body.refresh_token)
+
+    user = await UserService.get_user(db, _uuid.UUID(payload["sub"]))
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No session token provided"
+            detail="User account not found.",
         )
-    
-    session = await extend_session(credentials.credentials, ttl_minutes=30)
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired or invalid. Please login again."
-        )
-    
-    return APIResponse.success({
-        "message": "Session refreshed successfully",
-        "session_id": session.id,
-        "new_expires_at": session.expires_at.isoformat()
-    })
+
+    new_access_token = create_access_token(str(user.id), user.email, user.role.value)
+
+    return APIResponse.success(
+        data={
+            "access_token": new_access_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        },
+        message="Token refreshed.",
+    )
+
 
 @router.post("/logout-all", response_model=APIResponse[dict])
-async def logout_all_sessions(
-    current_user: User = Depends(get_current_user_from_session)
+async def logout_all(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Logout from all devices/sessions for current user"""
-    deleted_count = await delete_all_user_sessions(str(current_user.id))
-    
-    return APIResponse.success({
-        "message": f"Logged out from all {deleted_count} active session(s)",
-        "sessions_cleared": deleted_count
-    })
+    """
+    Revoke the current access token.
+    Note: with stateless JWTs we can only revoke tokens we know about.
+    The client must discard all stored tokens on other devices.
+    """
+    # Reuse the same logic as /logout
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No token provided.",
+        )
+
+    token = credentials.credentials
+    payload = decode_access_token(token)
+
+    if await token_blacklist.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token already revoked.",
+        )
+
+    exp = payload.get("exp")
+    expires_at = datetime.utcfromtimestamp(exp) if exp else datetime.utcnow()
+    await token_blacklist.add(token, expires_at)
+
+    return APIResponse.success(
+        data={"revoked": True},
+        message="Current session revoked. Please logout on other devices manually.",
+    )
+
 
 @router.get("/me", response_model=APIResponse[dict])
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user_from_session)
+async def me(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get current user information from valid session"""
-    return APIResponse.success({
-        "id": str(current_user.id),
-        "email": current_user.email,
-        "role": current_user.role.value,
-        "full_name": getattr(current_user, 'full_name', current_user.email)
-    })
+    """
+    Return the authenticated user's profile.
+    Validates the JWT and loads the user from the DB.
+    """
+    user = await get_user_from_jwt(credentials, db, list(UserRole))
+    return APIResponse.success(data=_user_dict(user), message="User info retrieved.")
+
 
 @router.get("/verify", response_model=APIResponse[dict])
-async def verify_session_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+async def verify(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    """Verify if session is valid and get session info"""
+    """
+    Check whether the supplied access token is currently valid.
+    Returns valid=True/False without raising an error.
+    """
     if not credentials:
-        return APIResponse.success({
-            "valid": False,
-            "message": "No session token provided"
-        })
-    
-    session = await get_session(credentials.credentials)
-    
-    if not session:
-        return APIResponse.success({
-            "valid": False,
-            "message": "Session is invalid or expired"
-        })
-    
-    return APIResponse.success({
-        "valid": True,
-        "session": session.to_dict()
-    })
+        return APIResponse.success(data={"valid": False}, message="No token provided.")
+
+    token = credentials.credentials
+    try:
+        payload = decode_access_token(token)
+        if await token_blacklist.is_blacklisted(token):
+            return APIResponse.success(data={"valid": False}, message="Token has been revoked.")
+        return APIResponse.success(
+            data={
+                "valid": True,
+                "user_id": payload.get("sub"),
+                "email": payload.get("email"),
+                "role": payload.get("role"),
+                "exp": payload.get("exp"),
+            },
+            message="Token is valid.",
+        )
+    except HTTPException:
+        return APIResponse.success(data={"valid": False}, message="Token is invalid or expired.")

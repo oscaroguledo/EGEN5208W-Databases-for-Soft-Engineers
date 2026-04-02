@@ -8,6 +8,7 @@ services:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./frontend/:/app/
+      - /app/node_modules
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
@@ -29,7 +30,7 @@ services:
       - ./backend/requirements.txt:/app/requirements.txt
       - ../sql:/app/sql  # Mount SQL files for database initialization
     environment:
-      - PYTHONPATH=/app/src
+      - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-gym_user}:${POSTGRES_PASSWORD:-gym_password}@postgres:5432/${POSTGRES_DB:-gym_db}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - DEBUG=${DEBUG:-false}

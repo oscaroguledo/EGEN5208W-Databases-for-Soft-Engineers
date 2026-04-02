@@ -25,7 +25,6 @@ class Member(Base):
     phone = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
     # Relationships
     user = relationship("User", back_populates="member")
     subscriptions = relationship("MemberSubscription", back_populates="member")

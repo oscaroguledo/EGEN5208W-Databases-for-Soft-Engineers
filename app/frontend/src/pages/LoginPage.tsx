@@ -22,33 +22,19 @@ export function LoginPage({ users, onLogin, onGoRegister }: LoginPageProps) {
     
     try {
       const resp = await login(email.trim(), password);
-      // resp may be { access_token, token_type, user } or user directly
-      const user = resp && (resp.user || resp);
-      
+      // resp is { access_token, refresh_token, token_type, expires_in, user }
+      const user = resp?.user ?? resp;
       if (user) {
         toast.success('Welcome back!');
         onLogin(user as User);
         return;
       }
-    } catch (err) {
-      console.error('Login error:', err);
-    }
-
-    // Fallback to local fixtures
-    setTimeout(() => {
-      const user = users.find(
-        (x) =>
-        x.username.toLowerCase() === email.toLowerCase().trim() &&
-        x.password === password
-      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Invalid email or password.';
+      toast.error(msg);
+    } finally {
       setLoading(false);
-      if (user) {
-        toast.success(`Welcome back!`);
-        onLogin(user);
-      } else {
-        toast.error('Invalid email or password. Please try again.');
-      }
-    }, 200);
+    }
   };
   return (
     <div

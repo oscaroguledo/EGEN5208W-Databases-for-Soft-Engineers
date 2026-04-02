@@ -3,82 +3,52 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, and_, or_, func, text
 from uuid import UUID
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time
 
-from models.trainings import TrainingSession, Room, Class
+from models.trainings import TrainingSession, Room, Class, SessionStatus
 from models.equipments import Equipment, EquipmentStatus
-from models.payments import Payment, PaymentStatus
+from models.payments import Payment
 from models.users.admin_staff import AdminStaff
 from models.users.user import User, UserRole
 from core.encryption import PasswordManager
 
+
 class AdminStaffService:
-    """
-    Enhanced service layer for Admin operations
-    """
 
     @staticmethod
     async def book_room_for_session(
         db: AsyncSession,
         session_id: UUID,
         room_id: UUID,
-        check_conflicts: bool = True
+        check_conflicts: bool = True,
     ) -> Optional[TrainingSession]:
-        """
-        Room Booking: UPDATE Sessions SET room_id = $1 ... (Trigger handles errors)
-        Includes conflict checking to prevent double bookings
-        """
+        session = (
+            await db.execute(select(TrainingSession).where(TrainingSession.id == session_id))
+        ).scalar_one_or_none()
+        if not session:
+            return None
+
         if check_conflicts:
-            # Check for scheduling conflicts
-            session_query = select(TrainingSession).where(TrainingSession.id == session_id)
-            session_result = await db.execute(session_query)
-            session = session_result.scalar_one_or_none()
-            
-            if not session:
-                return None
-            
-            # Check for existing sessions in the same room at the same time
-            conflict_query = (
-                select(TrainingSession)
-                .where(
-                    and_(
-                        TrainingSession.room_id == room_id,
-                        TrainingSession.session_date == session.session_date,
-                        TrainingSession.status == "scheduled",
-                        or_(
-                            and_(
-                                TrainingSession.start_time <= session.start_time,
-                                TrainingSession.end_time > session.start_time
-                            ),
-                            and_(
-                                TrainingSession.start_time < session.end_time,
-                                TrainingSession.end_time >= session.end_time
-                            ),
-                            and_(
-                                TrainingSession.start_time >= session.start_time,
-                                TrainingSession.end_time <= session.end_time
-                            )
-                        ),
-                        TrainingSession.id != session_id
-                    )
-                )
+            conflict_q = select(TrainingSession).where(
+                TrainingSession.room_id == room_id,
+                TrainingSession.session_date == session.session_date,
+                TrainingSession.status == SessionStatus.scheduled,
+                TrainingSession.id != session_id,
+                or_(
+                    and_(TrainingSession.start_time <= session.start_time, TrainingSession.end_time > session.start_time),
+                    and_(TrainingSession.start_time < session.end_time, TrainingSession.end_time >= session.end_time),
+                    and_(TrainingSession.start_time >= session.start_time, TrainingSession.end_time <= session.end_time),
+                ),
             )
-            
-            conflict_result = await db.execute(conflict_query)
-            conflicts = conflict_result.scalars().all()
-            
-            if conflicts:
+            if (await db.execute(conflict_q)).scalars().first():
                 raise ValueError(f"Room {room_id} is already booked during this time slot")
-        
-        # Update the session with the room
-        query = (
+
+        result = await db.execute(
             update(TrainingSession)
             .where(TrainingSession.id == session_id)
-            .values(room_id=room_id, updated_at=datetime.utcnow())
+            .values(room_id=room_id)
             .returning(TrainingSession)
         )
-        
-        result = await db.execute(query)
         await db.commit()
         return result.scalar_one_or_none()
 
@@ -90,82 +60,49 @@ class AdminStaffService:
         room_id: UUID,
         class_date: date,
         start_time: time,
-        end_time: time
+        end_time: time,
     ) -> Class:
-        """
-        Schedule a new class with room conflict checking
-        """
-        # Check for room conflicts
-        conflict_query = (
-            select(Class)
-            .where(
-                and_(
-                    Class.room_id == room_id,
-                    Class.class_date == class_date,
-                    Class.deleted_at.is_(None),
-                    or_(
-                        and_(
-                            Class.start_time <= start_time,
-                            Class.end_time > start_time
-                        ),
-                        and_(
-                            Class.start_time < end_time,
-                            Class.end_time >= end_time
-                        ),
-                        and_(
-                            Class.start_time >= start_time,
-                            Class.end_time <= end_time
-                        )
-                    )
-                )
-            )
+        conflict_q = select(Class).where(
+            Class.room_id == room_id,
+            Class.class_date == class_date,
+            or_(
+                and_(Class.start_time <= start_time, Class.end_time > start_time),
+                and_(Class.start_time < end_time, Class.end_time >= end_time),
+                and_(Class.start_time >= start_time, Class.end_time <= end_time),
+            ),
         )
-        
-        conflict_result = await db.execute(conflict_query)
-        conflicts = conflict_result.scalars().all()
-        
-        if conflicts:
+        if (await db.execute(conflict_q)).scalars().first():
             raise ValueError(f"Room {room_id} is already booked during this time slot")
-        
-        # Create the class
-        new_class = Class(
+
+        obj = Class(
             name=class_name,
             trainer_id=trainer_id,
             room_id=room_id,
             class_date=class_date,
             start_time=start_time,
             end_time=end_time,
-            created_at=datetime.utcnow()
         )
-        
-        db.add(new_class)
+        db.add(obj)
         await db.commit()
-        await db.refresh(new_class)
-        
-        return new_class
+        await db.refresh(obj)
+        return obj
 
     @staticmethod
     async def update_equipment_maintenance(
         db: AsyncSession,
         equipment_id: UUID,
         status: EquipmentStatus = EquipmentStatus.under_repair,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
     ) -> Optional[Equipment]:
-        """
-        Equipment Maintenance: UPDATE Equipment SET status = 'under repair' WHERE equipment_id = $1
-        """
-        query = (
+        values: dict = {"status": status, "updated_at": datetime.utcnow()}
+        if notes is not None:
+            values["maintenance_notes"] = notes
+        result = await db.execute(
             update(Equipment)
-            .where(Equipment.id == equipment_id, Equipment.deleted_at.is_(None))
-            .values(
-                status=status,
-                updated_at=datetime.utcnow(),
-                maintenance_notes=notes if notes else Equipment.maintenance_notes
-            )
+            .where(Equipment.id == equipment_id)
+            .values(**values)
             .returning(Equipment)
         )
-        
-        result = await db.execute(query)
         await db.commit()
         return result.scalar_one_or_none()
 
@@ -174,35 +111,20 @@ class AdminStaffService:
         db: AsyncSession,
         skip: int = 0,
         limit: int = 20,
-        status: Optional[str] = None
+        status: Optional[str] = None,
     ) -> Tuple[List[Equipment], int]:
-        """
-        List equipment with pagination and optional status filter.
-        Returns tuple of (equipment_list, total_count).
-        """
-        from models.equipments import EquipmentStatus
-        
-        # Build base query
-        base_query = select(Equipment).where(Equipment.deleted_at.is_(None))
-        count_query = select(func.count(Equipment.id)).where(Equipment.deleted_at.is_(None))
-        
+        base_q = select(Equipment)
+        count_q = select(func.count(Equipment.id))
         if status:
             try:
                 status_enum = EquipmentStatus(status)
-                base_query = base_query.where(Equipment.status == status_enum)
-                count_query = count_query.where(Equipment.status == status_enum)
+                base_q = base_q.where(Equipment.status == status_enum)
+                count_q = count_q.where(Equipment.status == status_enum)
             except ValueError:
-                pass  # Invalid status, ignore filter
-        
-        # Get total count
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
-        
-        # Get paginated data
-        data_query = base_query.offset(skip).limit(limit)
-        result = await db.execute(data_query)
-        
-        return result.scalars().all(), total
+                pass
+        total = (await db.execute(count_q)).scalar()
+        items = (await db.execute(base_q.offset(skip).limit(limit))).scalars().all()
+        return items, total
 
     @staticmethod
     async def list_sessions(
@@ -211,36 +133,32 @@ class AdminStaffService:
         limit: int = 20,
         member_id: Optional[UUID] = None,
         trainer_id: Optional[UUID] = None,
-        status_filter: Optional[str] = None
+        status_filter: Optional[str] = None,
     ) -> Tuple[List[TrainingSession], int]:
-        """
-        List training sessions with pagination and filters.
-        Returns tuple of (sessions_list, total_count).
-        """
-        base_query = select(TrainingSession)
-        count_query = select(func.count(TrainingSession.id))
-        
         conditions = []
         if member_id:
             conditions.append(TrainingSession.member_id == member_id)
         if trainer_id:
             conditions.append(TrainingSession.trainer_id == trainer_id)
         if status_filter:
-            conditions.append(TrainingSession.status == status_filter)
-        
+            try:
+                conditions.append(TrainingSession.status == SessionStatus(status_filter))
+            except ValueError:
+                pass
+
+        base_q = select(TrainingSession)
+        count_q = select(func.count(TrainingSession.id))
         if conditions:
-            base_query = base_query.where(and_(*conditions))
-            count_query = count_query.where(and_(*conditions))
-        
-        # Get total count
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
-        
-        # Get paginated data
-        data_query = base_query.offset(skip).limit(limit).order_by(TrainingSession.session_date.desc())
-        result = await db.execute(data_query)
-        
-        return result.scalars().all(), total
+            base_q = base_q.where(and_(*conditions))
+            count_q = count_q.where(and_(*conditions))
+
+        total = (await db.execute(count_q)).scalar()
+        items = (
+            await db.execute(
+                base_q.order_by(TrainingSession.session_date.desc()).offset(skip).limit(limit)
+            )
+        ).scalars().all()
+        return items, total
 
     @staticmethod
     async def list_payments(
@@ -249,15 +167,8 @@ class AdminStaffService:
         limit: int = 20,
         member_id: Optional[UUID] = None,
         subscription_id: Optional[UUID] = None,
-        status_filter: Optional[str] = None
+        status_filter: Optional[str] = None,
     ) -> Tuple[List[Payment], int]:
-        """
-        List payments with pagination and filters.
-        Returns tuple of (payments_list, total_count).
-        """
-        base_query = select(Payment)
-        count_query = select(func.count(Payment.id))
-        
         conditions = []
         if member_id:
             conditions.append(Payment.member_id == member_id)
@@ -265,59 +176,38 @@ class AdminStaffService:
             conditions.append(Payment.subscription_id == subscription_id)
         if status_filter:
             conditions.append(Payment.status == status_filter)
-        
+
+        base_q = select(Payment)
+        count_q = select(func.count(Payment.id))
         if conditions:
-            base_query = base_query.where(and_(*conditions))
-            count_query = count_query.where(and_(*conditions))
-        
-        # Get total count
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
-        
-        # Get paginated data
-        data_query = base_query.offset(skip).limit(limit).order_by(Payment.created_at.desc())
-        result = await db.execute(data_query)
-        
-        return result.scalars().all(), total
+            base_q = base_q.where(and_(*conditions))
+            count_q = count_q.where(and_(*conditions))
+
+        total = (await db.execute(count_q)).scalar()
+        items = (
+            await db.execute(base_q.order_by(Payment.paid_at.desc()).offset(skip).limit(limit))
+        ).scalars().all()
+        return items, total
 
     @staticmethod
     async def get_equipment_with_view(
         db: AsyncSession,
-        status_filter: str = None
+        status_filter: Optional[str] = None,
     ) -> list:
-        """
-        Get equipment list using database view for optimized performance
-        """
-        from sqlalchemy import text
-        
-        # Use the equipment_maintenance_view for optimized query
-        query = text("""
-            SELECT 
-                equipment_id,
-                equipment_name,
-                status,
-                maintenance_notes,
-                updated_at,
-                room_name,
-                room_capacity,
-                maintenance_status
+        sql = """
+            SELECT equipment_id, equipment_name, status, maintenance_notes,
+                   updated_at, room_name, room_capacity, maintenance_status
             FROM equipment_maintenance_view
-        """)
-        
-        params = {}
+        """
+        params: dict = {}
         if status_filter:
-            query += text(" WHERE status = :status_filter")
+            sql += " WHERE status = :status_filter"
             params["status_filter"] = status_filter
-        
-        query += text(" ORDER BY maintenance_status, room_name, equipment_name")
-        
-        result = await db.execute(query, params)
-        rows = result.fetchall()
-        
-        # Process the results
-        equipment_list = []
-        for row in rows:
-            equipment_list.append({
+        sql += " ORDER BY maintenance_status, room_name, equipment_name"
+
+        rows = (await db.execute(text(sql), params)).fetchall()
+        return [
+            {
                 "equipment_id": str(row.equipment_id),
                 "equipment_name": row.equipment_name,
                 "status": row.status,
@@ -325,111 +215,26 @@ class AdminStaffService:
                 "updated_at": row.updated_at.isoformat() if row.updated_at else None,
                 "room_name": row.room_name,
                 "room_capacity": row.room_capacity,
-                "maintenance_status": row.maintenance_status
-            })
-        
-        return equipment_list
-
-    @staticmethod
-    async def get_admin(db: AsyncSession, admin_id: UUID) -> Optional[AdminStaff]:
-        """
-        Fetch a single admin staff by ID
-        """
-        result = await db.execute(
-            select(AdminStaff).where(AdminStaff.id == admin_id, AdminStaff.deleted_at.is_(None))
-        )
-        return result.scalar_one_or_none()
-
-    @staticmethod
-    async def list_admins(
-        db: AsyncSession,
-        skip: int = 0,
-        limit: int = 100
-    ) -> Tuple[List[AdminStaff], int]:
-        """
-        List all admin staff with pagination.
-        Returns tuple of (admins_list, total_count).
-        """
-        count_query = select(func.count(AdminStaff.id)).where(AdminStaff.deleted_at.is_(None))
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
-        
-        data_query = select(AdminStaff).where(AdminStaff.deleted_at.is_(None)).offset(skip).limit(limit)
-        result = await db.execute(data_query)
-        
-        return result.scalars().all(), total
+                "maintenance_status": row.maintenance_status,
+            }
+            for row in rows
+        ]
 
     @staticmethod
     async def create_admin(
         db: AsyncSession,
         email: str,
         password: str,
-        full_name: str
+        full_name: str,
     ) -> AdminStaff:
-        """
-        Create a new admin staff along with the linked User
-        """
-        from core.encryption import PasswordManager
-
-        # 1️⃣ Hash the password
-        hashed_password = await PasswordManager.hash_password(password)
-
-        # 2️⃣ Create the User
-        new_user = User(
-            email=email,
-            password=hashed_password,
-            role=UserRole.admin
-        )
+        hashed = await PasswordManager.hash_password(password)
+        new_user = User(email=email, password=hashed, role=UserRole.admin)
         db.add(new_user)
         await db.commit()
         await db.refresh(new_user)
 
-        # 3️⃣ Create the AdminStaff profile
-        new_admin = AdminStaff(
-            id=new_user.id,
-            full_name=full_name,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
+        new_admin = AdminStaff(id=new_user.id, full_name=full_name)
         db.add(new_admin)
         await db.commit()
         await db.refresh(new_admin)
-
         return new_admin
-
-    @staticmethod
-    async def update_admin(db: AsyncSession, admin_id: UUID, **data) -> Optional[AdminStaff]:
-        """
-        Update admin staff fields
-        """
-        query = (
-            update(AdminStaff)
-            .where(AdminStaff.id == admin_id, AdminStaff.deleted_at.is_(None))
-            .values(**data, updated_at=datetime.utcnow())
-            .returning(AdminStaff)
-        )
-        result = await db.execute(query)
-        await db.commit()
-        return result.scalar_one_or_none()
-
-    @staticmethod
-    async def soft_delete_admin(db: AsyncSession, admin_id: UUID) -> bool:
-        """
-        Soft-delete an admin staff (mark deleted_at)
-        """
-        result = await db.execute(
-            update(AdminStaff)
-            .where(AdminStaff.id == admin_id, AdminStaff.deleted_at.is_(None))
-            .values(deleted_at=datetime.utcnow())
-        )
-        await db.commit()
-        return result.rowcount > 0
-
-    @staticmethod
-    async def hard_delete_admin(db: AsyncSession, admin_id: UUID) -> bool:
-        """
-        Permanently delete an admin staff
-        """
-        result = await db.execute(delete(AdminStaff).where(AdminStaff.id == admin_id))
-        await db.commit()
-        return result.rowcount > 0

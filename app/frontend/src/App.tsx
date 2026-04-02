@@ -264,6 +264,7 @@ export function App() {
     setCurrentPage(HOME_PAGE[user.role] || 'login');
   };
   const handleLogout = () => {
+    import('@/apis/auth').then(({ logout }) => logout().catch(() => {}));
     setCurrentUser(null);
     setCurrentPage('login');
     setPreviousPage(null);

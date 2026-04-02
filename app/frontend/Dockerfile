@@ -13,16 +13,10 @@ COPY .npmrc* ./
 
 # Clear any cached node_modules and reinstall
 RUN rm -rf node_modules package-lock.json && \
-    npm install
+    npm install --no-cache
 
 # Copy source code
 COPY . .
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001 && \
-    chown -R nextjs:nodejs /app
-USER nextjs
 
 # Expose development port
 EXPOSE 5173

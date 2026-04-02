@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
+from pydantic import BaseModel
 
 from core.db import get_db
 from core.auth import require_trainer, require_admin
@@ -12,20 +13,26 @@ from models.users.user import User
 
 router = APIRouter(prefix="/trainers", tags=["trainers"])
 
+
+class AvailabilityRequest(BaseModel):
+    """Trainer availability request schema"""
+    available_date: str  # "YYYY-MM-DD"
+    start_at: str  # "HH:MM"
+    end_at: str  # "HH:MM"
+
+
 @router.post("/availability", response_model=APIResponse[dict])
 async def set_trainer_availability(
-    available_date: str,
-    start_at: str,
-    end_at: str,
+    data: AvailabilityRequest,
     current_user: User = Depends(require_trainer),
     db: AsyncSession = Depends(get_db)
 ):
     """Set trainer availability"""
     from datetime import datetime, time, date
     
-    date_obj = datetime.strptime(available_date, "%Y-%m-%d").date()
-    start_time_obj = datetime.strptime(start_at, "%H:%M").time()
-    end_time_obj = datetime.strptime(end_at, "%H:%M").time()
+    date_obj = datetime.strptime(data.available_date, "%Y-%m-%d").date()
+    start_time_obj = datetime.strptime(data.start_at, "%H:%M").time()
+    end_time_obj = datetime.strptime(data.end_at, "%H:%M").time()
     
     availability = await TrainerService.set_availability(
         db=db,

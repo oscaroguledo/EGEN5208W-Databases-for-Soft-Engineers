@@ -3,31 +3,26 @@ set -e
 
 echo "🗄️ Initializing database..."
 
-# Wait for PostgreSQL to be ready
-until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
-  echo "Waiting for PostgreSQL..."
-  sleep 2
-done
-
-echo "✅ PostgreSQL is ready!"
+# Files are in the same directory as this script (/docker-entrypoint-initdb.d)
+SCRIPT_DIR="$(dirname "$0")"
 
 # Execute DDL (schema creation)
 echo "📋 Creating database schema..."
-if [ -f "/app/sql/DDL.sql" ]; then
-  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /app/sql/DDL.sql
+if [ -f "$SCRIPT_DIR/DDL.sql" ]; then
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$SCRIPT_DIR/DDL.sql"
   echo "✅ DDL executed successfully"
 else
-  echo "❌ DDL.sql not found"
+  echo "❌ DDL.sql not found at $SCRIPT_DIR/DDL.sql"
   exit 1
 fi
 
 # Execute DML (sample data)
 echo "📊 Inserting sample data..."
-if [ -f "/app/sql/DML.sql" ]; then
-  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /app/sql/DML.sql
+if [ -f "$SCRIPT_DIR/DML.sql" ]; then
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$SCRIPT_DIR/DML.sql"
   echo "✅ DML executed successfully"
 else
-  echo "❌ DML.sql not found"
+  echo "❌ DML.sql not found at $SCRIPT_DIR/DML.sql"
   exit 1
 fi
 

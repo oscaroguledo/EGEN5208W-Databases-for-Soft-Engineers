@@ -1,251 +1,222 @@
+"""
+Authentication & authorisation helpers.
+
+All protected routes depend on one of the RoleChecker instances at the bottom
+of this file (require_member, require_trainer, require_admin, …).
+
+Flow:
+  1. Client sends  Authorization: Bearer <access_token>
+  2. HTTPBearer extracts the raw token string
+  3. RoleChecker.__call__ decodes + verifies the JWT
+  4. Checks the token is not blacklisted (logout revocation)
+  5. Loads the User row from the DB
+  6. Asserts the user's role is in the allowed set
+  7. Returns the User object to the route handler
+"""
+
 from typing import Optional
 from uuid import UUID
+import uuid as _uuid
+
 from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
 from core.db import get_db
+from core.jwt import decode_access_token
+from core.sessions import token_blacklist
 from models.users.user import User, UserRole
 from services.users.user import UserService
 
-# Password hashing
+# ── password hashing ───────────────────────────────────────────────────────
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBasic(auto_error=False)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
+security = HTTPBearer(auto_error=False)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
     return pwd_context.hash(password)
 
 
+# ── core JWT → User resolution ─────────────────────────────────────────────
+
+async def get_user_from_jwt(
+    credentials: Optional[HTTPAuthorizationCredentials],
+    db: AsyncSession,
+    required_roles: list[UserRole],
+) -> User:
+    """
+    Shared logic used by every RoleChecker:
+      - validates Bearer token presence
+      - decodes + verifies JWT signature / expiry
+      - checks token is not blacklisted
+      - loads User from DB
+      - enforces role
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+
+    # Decode & verify signature / expiry
+    payload = decode_access_token(token)
+
+    # Revocation check (logout blacklist)
+    if await token_blacklist.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked. Please login again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Load user from DB (ensures account still exists / not deleted)
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed token: missing subject.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = await UserService.get_user(db, _uuid.UUID(user_id_str))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account not found.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Role enforcement
+    if user.role not in required_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Required role(s): {[r.value for r in required_roles]}",
+        )
+
+    return user
+
+
+# ── RoleChecker dependency ─────────────────────────────────────────────────
+
 class RoleChecker:
-    """
-    Role-based access control dependency for FastAPI
-    Uses email/password authentication (no JWT tokens)
-    """
-    
+    """FastAPI dependency that validates a JWT and enforces role membership."""
+
     def __init__(self, allowed_roles: list[UserRole]):
         self.allowed_roles = allowed_roles
-    
+
     async def __call__(
         self,
-        credentials: Optional[HTTPBasicCredentials] = Depends(security),
-        db: AsyncSession = Depends(get_db)
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+        db: AsyncSession = Depends(get_db),
     ) -> User:
-        """
-        Authenticate user with email/password and check role
-        """
-        if not credentials:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        
-        # Authenticate with email and password
-        user = await UserService.get_user_by_email(db, credentials.username)
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        
-        if not verify_password(credentials.password, user.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        
-        if user.role not in self.allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required roles: {[role.value for role in self.allowed_roles]}"
-            )
-        
-        return user
+        return await get_user_from_jwt(credentials, db, self.allowed_roles)
 
-# Predefined role checkers for common use cases
-require_member = RoleChecker([UserRole.member])
-require_trainer = RoleChecker([UserRole.trainer])
-require_admin = RoleChecker([UserRole.admin])
+
+# ── pre-built role checkers (import these in route files) ──────────────────
+require_member          = RoleChecker([UserRole.member])
+require_trainer         = RoleChecker([UserRole.trainer])
+require_admin           = RoleChecker([UserRole.admin])
 require_trainer_or_admin = RoleChecker([UserRole.trainer, UserRole.admin])
 require_member_or_trainer = RoleChecker([UserRole.member, UserRole.trainer])
-require_any_role = RoleChecker([UserRole.member, UserRole.trainer, UserRole.admin])
+require_any_role        = RoleChecker([UserRole.member, UserRole.trainer, UserRole.admin])
+
+
+# ── PermissionChecker (fine-grained, used inside route handlers) ───────────
 
 class PermissionChecker:
-    """
-    Permission-based access control for more granular access.
-    Uses database queries to verify trainer-member assignments.
-    """
-    
+
     @staticmethod
     async def can_access_member_data(
-        current_user: User, 
+        current_user: User,
         target_member_id: UUID,
-        db: AsyncSession
+        db: AsyncSession,
     ) -> bool:
-        """
-        Check if current user can access member data.
-        Members can only access their own data.
-        Trainers can access data of members assigned to them (via training sessions).
-        Admins can access all member data.
-        """
-        # Members can only access their own data
         if current_user.role == UserRole.member:
             return current_user.id == target_member_id
-        
-        # Admins can access all member data
         if current_user.role == UserRole.admin:
             return True
-        
-        # Trainers can access data of members assigned to them
         if current_user.role == UserRole.trainer:
             from sqlalchemy import select, exists
-            from models.trainings import TrainingSession
-            
-            # Check if trainer has any training sessions with this member
-            query = select(
-                exists().where(
-                    (TrainingSession.trainer_id == current_user.id) &
-                    (TrainingSession.member_id == target_member_id)
-                )
-            )
-            result = await db.execute(query)
-            has_training_session = result.scalar()
-            
-            if has_training_session:
+            from models.trainings import TrainingSession, Class, Enrollment
+
+            q = select(exists().where(
+                (TrainingSession.trainer_id == current_user.id) &
+                (TrainingSession.member_id == target_member_id)
+            ))
+            if (await db.execute(q)).scalar():
                 return True
-            
-            # Also check if member is enrolled in trainer's classes
-            from models.trainings import Class, Enrollment
-            query = select(
-                exists().where(
-                    (Class.trainer_id == current_user.id) &
-                    (Enrollment.class_id == Class.id) &
-                    (Enrollment.member_id == target_member_id)
-                )
-            )
-            result = await db.execute(query)
-            has_class_enrollment = result.scalar()
-            
-            return has_class_enrollment
-        
+
+            q2 = select(exists().where(
+                (Class.trainer_id == current_user.id) &
+                (Enrollment.class_id == Class.id) &
+                (Enrollment.member_id == target_member_id)
+            ))
+            return (await db.execute(q2)).scalar()
         return False
-    
+
     @staticmethod
     async def can_access_trainer_data(
-        current_user: User, 
+        current_user: User,
         target_trainer_id: UUID,
-        db: AsyncSession
+        db: AsyncSession,
     ) -> bool:
-        """
-        Check if current user can access trainer data.
-        Trainers can access their own data.
-        Members can access data of trainers assigned to them.
-        Admins can access all trainer data.
-        """
-        # Trainers can access their own data
         if current_user.role == UserRole.trainer:
             return current_user.id == target_trainer_id
-        
-        # Admins can access all trainer data
         if current_user.role == UserRole.admin:
             return True
-        
-        # Members can access data of their assigned trainers
         if current_user.role == UserRole.member:
             from sqlalchemy import select, exists
             from models.trainings import TrainingSession
-            
-            # Check if member has any training sessions with this trainer
-            query = select(
-                exists().where(
-                    (TrainingSession.member_id == current_user.id) &
-                    (TrainingSession.trainer_id == target_trainer_id)
-                )
-            )
-            result = await db.execute(query)
-            return result.scalar()
-        
+
+            q = select(exists().where(
+                (TrainingSession.member_id == current_user.id) &
+                (TrainingSession.trainer_id == target_trainer_id)
+            ))
+            return (await db.execute(q)).scalar()
         return False
-    
+
     @staticmethod
     def can_manage_schedules(current_user: User) -> bool:
-        """
-        Check if current user can manage schedules.
-        Only trainers and admins can manage schedules.
-        """
         return current_user.role in [UserRole.trainer, UserRole.admin]
-    
+
     @staticmethod
     def can_manage_billing(current_user: User) -> bool:
-        """
-        Check if current user can access billing information.
-        Only admins can manage billing.
-        """
         return current_user.role == UserRole.admin
-    
+
     @staticmethod
     async def can_view_health_metrics(
-        current_user: User, 
+        current_user: User,
         member_id: Optional[UUID] = None,
-        db: AsyncSession = None
+        db: AsyncSession = None,
     ) -> bool:
-        """
-        Check if current user can view health metrics.
-        Members can view their own health metrics.
-        Trainers can view health metrics of assigned members.
-        Admins can view all health metrics.
-        """
-        # Members can view their own health metrics
         if current_user.role == UserRole.member:
             return member_id is None or current_user.id == member_id
-        
-        # Admins can view all health metrics
         if current_user.role == UserRole.admin:
             return True
-        
-        # Trainers can view health metrics of assigned members
-        if current_user.role == UserRole.trainer and db is not None and member_id is not None:
-            from sqlalchemy import select, exists
-            from models.trainings import TrainingSession
-            
-            # Check if trainer has any training sessions with this member
-            query = select(
-                exists().where(
+        if current_user.role == UserRole.trainer:
+            if db is not None and member_id is not None:
+                from sqlalchemy import select, exists
+                from models.trainings import TrainingSession
+
+                q = select(exists().where(
                     (TrainingSession.trainer_id == current_user.id) &
                     (TrainingSession.member_id == member_id)
-                )
-            )
-            result = await db.execute(query)
-            return result.scalar()
-        
-        # If no member_id specified, trainers can view (filtered list will be applied)
-        if current_user.role == UserRole.trainer and member_id is None:
-            return True
-        
+                ))
+                return (await db.execute(q)).scalar()
+            return True  # trainer can see their own list (filtered elsewhere)
         return False
 
-def get_current_user_role(current_user: User) -> UserRole:
-    """Helper function to get current user's role"""
-    return current_user.role
 
-def is_admin(current_user: User) -> bool:
-    """Check if current user is admin"""
-    return current_user.role == UserRole.admin
-
-def is_trainer(current_user: User) -> bool:
-    """Check if current user is trainer"""
-    return current_user.role == UserRole.trainer
-
-def is_member(current_user: User) -> bool:
-    """Check if current user is member"""
-    return current_user.role == UserRole.member
+# ── tiny helpers ───────────────────────────────────────────────────────────
+def is_admin(u: User) -> bool:   return u.role == UserRole.admin
+def is_trainer(u: User) -> bool: return u.role == UserRole.trainer
+def is_member(u: User) -> bool:  return u.role == UserRole.member

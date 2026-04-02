@@ -5,19 +5,14 @@ from sqlalchemy import update, delete
 from uuid import UUID
 from datetime import datetime
 
-from models.payments import Payment
+from models.payments import Payment, PaymentStatus
 
 
 class PaymentService:
-    """
-    Service layer for Payment operations
-    """
 
     @staticmethod
     async def get_payment(db: AsyncSession, payment_id: UUID) -> Optional[Payment]:
-        result = await db.execute(
-            select(Payment).where(Payment.id == payment_id, Payment.deleted_at.is_(None))
-        )
+        result = await db.execute(select(Payment).where(Payment.id == payment_id))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -25,17 +20,16 @@ class PaymentService:
         db: AsyncSession,
         member_id: Optional[UUID] = None,
         subscription_id: Optional[UUID] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
     ) -> List[Payment]:
-        query = select(Payment).where(Payment.deleted_at.is_(None))
+        q = select(Payment)
         if member_id:
-            query = query.where(Payment.member_id == member_id)
+            q = q.where(Payment.member_id == member_id)
         if subscription_id:
-            query = query.where(Payment.subscription_id == subscription_id)
+            q = q.where(Payment.subscription_id == subscription_id)
         if status:
-            query = query.where(Payment.status == status)
-        result = await db.execute(query)
-        return result.scalars().all()
+            q = q.where(Payment.status == status)
+        return (await db.execute(q)).scalars().all()
 
     @staticmethod
     async def create_payment(
@@ -44,50 +38,26 @@ class PaymentService:
         subscription_id: UUID,
         amount: float,
         paid_at: datetime,
-        status: str = "pending"
+        payment_method: str,
+        status: PaymentStatus = PaymentStatus.pending,
     ) -> Payment:
-        new_payment = Payment(
+        obj = Payment(
             member_id=member_id,
             subscription_id=subscription_id,
             amount=amount,
             paid_at=paid_at,
-            status=status
+            payment_method=payment_method,
+            status=status,
         )
-        db.add(new_payment)
+        db.add(obj)
         await db.commit()
-        await db.refresh(new_payment)
-        return new_payment
+        await db.refresh(obj)
+        return obj
 
     @staticmethod
     async def update_payment(db: AsyncSession, payment_id: UUID, **data) -> Optional[Payment]:
-        query = (
-            update(Payment)
-            .where(Payment.id == payment_id, Payment.deleted_at.is_(None))
-            .values(**data)
-            .returning(Payment)
+        result = await db.execute(
+            update(Payment).where(Payment.id == payment_id).values(**data).returning(Payment)
         )
-        result = await db.execute(query)
         await db.commit()
         return result.scalar_one_or_none()
-
-    @staticmethod
-    async def soft_delete_payment(db: AsyncSession, payment_id: UUID) -> bool:
-        """
-        Marks a payment as deleted instead of actually deleting
-        """
-        result = await db.execute(
-            update(Payment)
-            .where(Payment.id == payment_id, Payment.deleted_at.is_(None))
-            .values(deleted_at=datetime.utcnow())
-        )
-        await db.commit()
-        return result.rowcount > 0
-
-    @staticmethod
-    async def hard_delete_payment(db: AsyncSession, payment_id: UUID) -> bool:
-        """
-        Permanently deletes a payment
-        """
-        result = await db.execute(delete(Payment).where(Payment.id == payment_id))
-        await db.commit()
-        return result.rowcount > 0
