@@ -4,7 +4,7 @@ A comprehensive web-based application for managing health and fitness club opera
 
 **Course**: EGEN5208W - Databases for Software Engineers  
 **Institution**: Carleton University  
-**Technologies**: PostgreSQL, FastAPI, React, SQLAlchemy
+**Technologies**: PostgreSQL, FastAPI, React, SQLAlchemy, Docker Compose
 
 ---
 
@@ -23,165 +23,262 @@ The video demonstrates all 8 required operations:
 
 ---
 
-## 🚀 Quick Start (Recommended)
+## 🚀 Setup and Installation
 
-The fastest way to run the application using Docker Compose:
+### Prerequisites
+
+- **Docker Desktop** (recommended) or Docker Engine
+- **Git** (for cloning the repository)
+- **Modern web browser** (Chrome, Firefox, Safari, Edge)
+
+### Quick Start with Docker Compose (Recommended) 🐳
 
 ```bash
-# 1. Navigate to app directory
-cd app
+# 1. Clone and navigate
+git clone <repository-url>
+cd EGEN5208W-Databases-for-Soft-Engineers
 
-# 2. Start all services (database + backend + frontend)
+# 2. Start all services
 docker-compose up -d
 
-# 3. Access the application
-# Frontend: http://localhost:3000
-# API Docs: http://localhost:8000/docs
+# 3. Monitor startup (optional)
+docker-compose logs -f
 ```
 
-**Default Login Credentials:**
-- Admin: `admin@gym.com` / `password123`
-- Trainer: `trainer1@gym.com` / `password123`
-- Member: `member1@gym.com` / `password123`
+#### What Happens Automatically
+
+**📊 Database Initialization**: PostgreSQL container starts, creates `gym_db` database, automatically executes `sql/DDL.sql` (creates tables, views, triggers) and `sql/DML.sql` (populates sample data)
+
+**🔧 Backend Service**: FastAPI server on port 8000 with hot reload and auto database connection
+
+**⚛️ Frontend Service**: React development server on port 3000 with hot reload
+
+#### Access Points
+
+- **🌐 Frontend**: http://localhost:3000
+- **📚 API Documentation**: http://localhost:8000/docs
+- **🗄️ Database**: localhost:5432 (user: `gym_user`, password: `gym_password`)
+
+#### Default Login Credentials
+
+- **👑 Admin**: `admin@gym.com` / `password123`
+- **🏋 Trainer**: `trainer1@gym.com` / `password123`
+- **👤 Member**: `member1@gym.com` / `password123`
+
+---
+
+## 📋 Application Architecture
+
+### Technology Stack
+
+- **Frontend**: React 18 + TypeScript + Vite + TailwindCSS
+- **Backend**: FastAPI + Python 3.11 + SQLAlchemy + Pydantic
+- **Database**: PostgreSQL 15 + AsyncPG driver
+- **Containerization**: Docker Compose + Multi-stage builds
+- **Authentication**: Direct password validation with bcrypt password hashing
+
+### Security Assumptions
+- **Local Development**: No HTTPS/TLS setup in development mode
+- **Database Security**: Database not exposed to public internet, only accessible within Docker network
+- **Default Credentials**: Sample passwords are for development only (change in production)
+- **Password Authentication**: Direct password validation with bcrypt hashing
+
+### Project Structure
+
+```
+EGEN5208W-Databases-for-Soft-Engineers/
+├── app/
+│   ├── docker-compose.yml          # Service orchestration
+│   ├── frontend/                # React application
+│   │   ├── src/
+│   │   ├── public/
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   └── backend/                 # FastAPI application
+│       ├── src/
+│       ├── routes/
+│       ├── models/
+│       ├── services/
+│       ├── core/
+│       ├── Dockerfile
+│       └── requirements.txt
+├── sql/
+│   ├── DDL.sql                   # Database schema
+│   ├── DML.sql                   # Sample data
+│   └── dbdiagram.md              # Schema documentation
+└── docs/
+    ├── ER_Diagram.pdf            # Entity relationship diagram
+    └── Normalization_Evidence.md   # Database design documentation
+```
 
 ## Database Setup
 
-### Option 1: Manual Database Setup
-#### 1. Create Database
-```sql
-CREATE DATABASE gym_db;
-CREATE USER gym_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE gym_db TO gym_user;
-```
+### 🗄️ Database Files Overview
 
-#### 2. Execute DDL Script
+The project includes two essential SQL files:
+
+- **`sql/DDL.sql`** - Data Definition Language (creates all tables, views, triggers, indexes)
+- **`sql/DML.sql`** - Data Manipulation Language (inserts sample data for testing)
+- **`sql/dbdiagram.md`** - Database schema documentation for ER diagram
+- **`sql/init.sh`** - Database initialization script (for Docker automation)
+
+#### Complete Setup with Database Initialization
+
 ```bash
-psql -d gym_db -U gym_user -f sql/DDL.sql
-```
+# 1. Navigate to project root
+cd /path/to/EGEN5208W-Databases-for-Soft-Engineers
 
-#### 3. Execute DML Script (Sample Data)
-```bash
-psql -d gym_db -U gym_user -f sql/DML.sql
-```
-
-### Option 2: Docker Compose (Recommended)
-#### 1. Start All Services with Docker Compose
-```bash
-# Navigate to the app directory
-cd app
-
-# Start all services (database, backend, frontend)
+# 2. Start all services (database + backend + frontend)
+# This automatically:
+# - Creates PostgreSQL database
+# - Executes DDL.sql (creates tables/views/triggers)
+# - Executes DML.sql (populates sample data)
+# - Starts backend API server
+# - Starts frontend development server
 docker-compose up -d
 
-# View logs to monitor startup
+# 3. Monitor startup (optional)
 docker-compose logs -f
 
-# Stop services when done
-docker-compose down
+# 4. Access applications
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
+# Database: localhost:5432 (user: gym_user, password: gym_password)
 ```
 
-#### 2. Docker Services
-- **Database**: PostgreSQL 13 on port 5432 (auto-initialized with DDL/DML)
-- **Backend**: FastAPI on port 8000 (auto-restarts on code changes)
-- **Frontend**: Web interface on port 3000 (auto-restarts on code changes)
+#### Docker Services Details
+- **Database**: PostgreSQL 13 on port 5432
+  - Auto-creates database and user
+  - Auto-executes DDL.sql on startup
+  - Auto-executes DML.sql for sample data
+- **Backend**: FastAPI on port 8000
+  - Hot reload on code changes
+  - Auto-connects to database
+- **Frontend**: React development server on port 3000
+  - Hot reload on code changes
+  - Auto-configured API endpoint
 
-#### 3. Access Points
-- **API Documentation**: http://localhost:8000/docs
-- **Frontend Application**: http://localhost:3000
-- **Database**: localhost:5432 (user: gym_user, password: gym_password)
 
 ## Application Setup
 
-### Option 1: Docker Compose (Recommended)
-See "Option 2: Docker Compose" in Database Setup section above.
+#### Common Database Issues
 
-### Option 2: Manual Setup
-#### 1. Clone/Download the Project
-```bash
-# Navigate to the project directory
-cd /path/to/EGEN5208W-Databases-for-Soft-Engineers
-```
+1. **Docker Database Issues**
+   ```bash
+   # Check database container logs
+   docker-compose logs db
+   
+   # Restart database service
+   docker-compose restart db
+   
+   # Rebuild database container
+   docker-compose up -d --build db
+   ```
 
-#### 2. Create Virtual Environment
-```bash
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-```
-
-#### 3. Install Dependencies
-```bash
-pip install -r app/backend/requirements.txt
-```
-
-#### 4. Environment Configuration
-Create a `.env` file in the project root:
-
-```env
-# Database Configuration
-DATABASE_URL=postgresql+asyncpg://gym_user:your_password@localhost/gym_db
-
-# Application Configuration
-APP_NAME="Health and Fitness Club Management System"
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# CORS Settings (if needed)
-CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
-```
-
-#### 5. Run Database Migration
-```bash
-python -c "
-import asyncio
-import sys
-sys.path.append('app/backend')
-from core.db import engine, Base
-
-async def create_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print('Database tables created successfully!')
-
-asyncio.run(create_tables())
-"
-```
-
-## Running the Application
-
-### Docker Compose (Recommended)
-```bash
-cd app
-docker-compose up -d
-```
-
-### Manual Development Mode
-```bash
-# Navigate to backend directory
-cd app/backend
-
-# Start the FastAPI development server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Production Mode
-```bash
-# Start with uvicorn workers
-uvicorn app.backend.main:app --host 0.0.0.0 --port 8000 --workers 4
-```
+2. **Connection Issues**
+   ```bash
+   # Test database connection
+   docker-compose exec db pg_isready -U gym_user
+   
+   # Check database exists
+   docker-compose exec db psql -U postgres -c "\l"
+   
+   # Verify user permissions
+   docker-compose exec db psql -U postgres -c "\du"
+   ```
 
 ## API Documentation
 
-Once the application is running, you can access:
+Once the application is running, you can access comprehensive API documentation:
 
+### 📚 Interactive Documentation
 - **Swagger UI**: http://localhost:8000/docs
+  - Interactive API testing interface
+  - Auto-generated from FastAPI OpenAPI schema
+  - Try all endpoints directly in browser
 - **ReDoc**: http://localhost:8000/redoc
+  - Alternative API documentation format
+  - Mobile-friendly documentation layout
 - **OpenAPI Schema**: http://localhost:8000/openapi.json
+  - Machine-readable API specification
+  - For programmatic access and integration
+
+### 🔗 Frontend API Integration
+
+The frontend uses organized API modules in `src/apis/`:
+
+- **`apis/auth.ts`** - Authentication endpoints (login, logout)
+- **`apis/members.ts`** - Member operations (profile, goals, health metrics, dashboard, enrollment, sessions)
+- **`apis/trainers.ts`** - Trainer operations (availability, schedule)
+- **`apis/admin.ts`** - Admin operations (classes, equipment, room assignments)
+- **`apis/health.ts`** - Health tracking endpoints
+- **`apis/index.ts`** - Core API client configuration and error handling
+
+### 📋 Complete API Endpoint Coverage
+
+#### Authentication Endpoints
+- `POST /auth/login` - User login with direct password validation
+- `POST /auth/logout` - User logout and session cleanup
+
+#### Member Operations
+- `POST /members/register` - New user registration
+- `GET /members/me` - Get current member profile
+- `PUT /members/me` - Update member profile information
+- `POST /members/goals` - Create or update fitness goals
+- `GET /members/health-history` - Retrieve health metrics history
+- `POST /members/health-metrics` - Add new health measurements
+- `GET /members/dashboard` - Get member dashboard data
+- `POST /members/enroll/{class_id}` - Enroll in fitness class
+- `DELETE /members/enroll/{class_id}` - Cancel class enrollment
+- `POST /members/book-session` - Book personal training session
+- `DELETE /members/session/{session_id}` - Cancel training session
+
+#### Trainer Operations
+- `POST /trainers/availability` - Set trainer availability time slots
+- `GET /trainers/schedule` - View trainer schedule
+- `GET /trainers/schedule-optimized` - Optimized schedule using database views
+
+#### Admin Operations
+- `POST /admin/classes` - Create new fitness classes
+- `PUT /admin/sessions/{session_id}/room` - Assign rooms to training sessions
+- `GET /admin/equipment` - List all equipment with status
+- `PUT /admin/equipment/{equipment_id}/status` - Update equipment maintenance status
+- `GET /admin/equipment-optimized` - Equipment list using database views
+
+### 🔧 API Usage Examples
+
+#### Authentication
+```bash
+# Login with direct password validation (no JWT tokens)
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@gym.com", "password": "password123"}'
+
+# Access protected endpoint with session cookie
+curl -X GET "http://localhost:8000/members/me" \
+  -H "Cookie: session_id=YOUR_SESSION_COOKIE"
+```
+
+#### Member Operations
+```bash
+# Get member profile (using session cookie)
+curl -X GET "http://localhost:8000/members/me" \
+  -H "Cookie: session_id=YOUR_SESSION_COOKIE"
+
+# Update member profile (using session cookie)
+curl -X PUT "http://localhost:8000/members/me" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session_id=YOUR_SESSION_COOKIE" \
+  -d '{"full_name": "John Doe", "phone": "555-1234"}'
+```
+
+### 🌐 Frontend-Backend Communication
+
+- **Base URL**: All frontend API calls use `http://localhost:8000` as base
+- **Error Handling**: Centralized error handling in `apis/index.ts`
+- **Type Safety**: TypeScript interfaces for all API requests/responses
+- **Async/Await**: Modern async/await patterns for API calls
+- **Authentication**: Session-based authentication with automatic cookie management
 
 ## Default Users (from DML.sql)
 
@@ -321,27 +418,6 @@ backend/
 - SQL injection prevention through ORM
 - Input validation with Pydantic models
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Error**
-   - Verify PostgreSQL is running
-   - Check database credentials in `.env`
-   - Ensure database exists: `CREATE DATABASE gym_db;`
-
-2. **Module Import Errors**
-   - Activate virtual environment
-   - Install dependencies: `pip install -r requirements.txt`
-
-3. **Authentication Issues**
-   - Verify JWT secret key in `.env`
-   - Check token expiration settings
-
-4. **Database Schema Issues**
-   - Run DDL.sql first: `psql -d gym_db -f DDL.sql`
-   - Verify tables exist: `\dt` in psql
-
 ### Logs and Debugging
 - Application logs: Check console output
 - Database logs: PostgreSQL logs
@@ -364,14 +440,6 @@ backend/
 3. **Simulated Billing**: No real payment gateway (as per project requirements)
 4. **Password Authentication**: Direct password validation (no JWT tokens)
 5. **Async Database**: SQLAlchemy async for better performance
-
-See `PROJECT_REPORT.md` for detailed design documentation.
-
----
-
-## 📄 License
-
-This project is for educational purposes as part of the Database Systems course (EGEN5208W) at Carleton University.
 
 ---
 

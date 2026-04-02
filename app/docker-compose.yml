@@ -1,21 +1,19 @@
-version: '3.8'
-
 services:
-  # Frontend Service (Development or Production)
+  # Frontend Service
   frontend:
     build:
-      context: ./app/frontend
+      context: ./frontend
       dockerfile: ${DOCKERFILE:-Dockerfile}
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
-      - ./app/frontend/src:/app/src
-      - ./app/frontend/public:/app/public
-      - ./app/frontend/index.html:/app/index.html
-      - ./app/frontend/package.json:/app/package.json
-      - ./app/frontend/tailwind.config.js:/app/tailwind.config.js
-      - ./app/frontend/vite.config.ts:/app/vite.config.ts
-      - ./app/frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
@@ -23,21 +21,19 @@ services:
       - backend
     networks:
       - gym-network
-    profiles:
-      - frontend
-      - dev
-      - prod
+    
 
-  # Backend Service (Development or Production)
+  # Backend Service
   backend:
     build:
-      context: ./app/backend
+      context: ./backend
       dockerfile: ${DOCKERFILE:-Dockerfile}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./app/backend/src:/app/src
-      - ./app/backend/requirements.txt:/app/requirements.txt
+      - ./backend/src:/app/src
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ../sql:/app/sql  # Mount SQL files for database initialization
     environment:
       - PYTHONPATH=/app/src
       - DATABASE_URL=postgresql://${POSTGRES_USER:-gym_user}:${POSTGRES_PASSWORD:-gym_password}@postgres:5432/${POSTGRES_DB:-gym_db}
@@ -48,10 +44,6 @@ services:
         condition: service_healthy
     networks:
       - gym-network
-    profiles:
-      - backend
-      - dev
-      - prod
 
   # PostgreSQL Database
   postgres:
@@ -64,7 +56,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gym_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Mount SQL scripts for initialization
+      - ../sql:/docker-entrypoint-initdb.d
     networks:
       - gym-network
     healthcheck:
@@ -72,10 +65,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    profiles:
-      - postgres
-      - dev
-      - prod
 
 volumes:
   postgres_data:

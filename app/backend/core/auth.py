@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,33 +82,75 @@ require_any_role = RoleChecker([UserRole.member, UserRole.trainer, UserRole.admi
 
 class PermissionChecker:
     """
-    Permission-based access control for more granular access
+    Permission-based access control for more granular access.
+    Uses database queries to verify trainer-member assignments.
     """
     
     @staticmethod
-    def can_access_member_data(current_user: User, target_member_id: UUID) -> bool:
+    async def can_access_member_data(
+        current_user: User, 
+        target_member_id: UUID,
+        db: AsyncSession
+    ) -> bool:
         """
-        Check if current user can access member data
+        Check if current user can access member data.
+        Members can only access their own data.
+        Trainers can access data of members assigned to them (via training sessions).
+        Admins can access all member data.
         """
         # Members can only access their own data
         if current_user.role == UserRole.member:
             return current_user.id == target_member_id
         
-        # Trainers can access data of members assigned to them
-        if current_user.role == UserRole.trainer:
-            # In a real implementation, you'd check if member is assigned to trainer
-            return True  # Simplified for demo
-        
         # Admins can access all member data
         if current_user.role == UserRole.admin:
             return True
         
+        # Trainers can access data of members assigned to them
+        if current_user.role == UserRole.trainer:
+            from sqlalchemy import select, exists
+            from models.trainings import TrainingSession
+            
+            # Check if trainer has any training sessions with this member
+            query = select(
+                exists().where(
+                    (TrainingSession.trainer_id == current_user.id) &
+                    (TrainingSession.member_id == target_member_id)
+                )
+            )
+            result = await db.execute(query)
+            has_training_session = result.scalar()
+            
+            if has_training_session:
+                return True
+            
+            # Also check if member is enrolled in trainer's classes
+            from models.trainings import Class, Enrollment
+            query = select(
+                exists().where(
+                    (Class.trainer_id == current_user.id) &
+                    (Enrollment.class_id == Class.id) &
+                    (Enrollment.member_id == target_member_id)
+                )
+            )
+            result = await db.execute(query)
+            has_class_enrollment = result.scalar()
+            
+            return has_class_enrollment
+        
         return False
     
     @staticmethod
-    def can_access_trainer_data(current_user: User, target_trainer_id: UUID) -> bool:
+    async def can_access_trainer_data(
+        current_user: User, 
+        target_trainer_id: UUID,
+        db: AsyncSession
+    ) -> bool:
         """
-        Check if current user can access trainer data
+        Check if current user can access trainer data.
+        Trainers can access their own data.
+        Members can access data of trainers assigned to them.
+        Admins can access all trainer data.
         """
         # Trainers can access their own data
         if current_user.role == UserRole.trainer:
@@ -117,40 +160,76 @@ class PermissionChecker:
         if current_user.role == UserRole.admin:
             return True
         
+        # Members can access data of their assigned trainers
+        if current_user.role == UserRole.member:
+            from sqlalchemy import select, exists
+            from models.trainings import TrainingSession
+            
+            # Check if member has any training sessions with this trainer
+            query = select(
+                exists().where(
+                    (TrainingSession.member_id == current_user.id) &
+                    (TrainingSession.trainer_id == target_trainer_id)
+                )
+            )
+            result = await db.execute(query)
+            return result.scalar()
+        
         return False
     
     @staticmethod
     def can_manage_schedules(current_user: User) -> bool:
         """
-        Check if current user can manage schedules
+        Check if current user can manage schedules.
+        Only trainers and admins can manage schedules.
         """
         return current_user.role in [UserRole.trainer, UserRole.admin]
     
     @staticmethod
     def can_manage_billing(current_user: User) -> bool:
         """
-        Check if current user can access billing information
+        Check if current user can access billing information.
+        Only admins can manage billing.
         """
         return current_user.role == UserRole.admin
     
     @staticmethod
-    def can_view_health_metrics(
+    async def can_view_health_metrics(
         current_user: User, 
-        member_id: Optional[UUID] = None
+        member_id: Optional[UUID] = None,
+        db: AsyncSession = None
     ) -> bool:
         """
-        Check if current user can view health metrics
+        Check if current user can view health metrics.
+        Members can view their own health metrics.
+        Trainers can view health metrics of assigned members.
+        Admins can view all health metrics.
         """
         # Members can view their own health metrics
         if current_user.role == UserRole.member:
             return member_id is None or current_user.id == member_id
         
-        # Trainers can view health metrics of assigned members
-        if current_user.role == UserRole.trainer:
-            return True  # Simplified - in real implementation, check assignment
-        
         # Admins can view all health metrics
         if current_user.role == UserRole.admin:
+            return True
+        
+        # Trainers can view health metrics of assigned members
+        if current_user.role == UserRole.trainer and db is not None and member_id is not None:
+            from sqlalchemy import select, exists
+            from models.trainings import TrainingSession
+            
+            # Check if trainer has any training sessions with this member
+            query = select(
+                exists().where(
+                    (TrainingSession.trainer_id == current_user.id) &
+                    (TrainingSession.member_id == member_id)
+                )
+            )
+            result = await db.execute(query)
+            return result.scalar()
+        
+        # If no member_id specified, trainers can view (filtered list will be applied)
+        if current_user.role == UserRole.trainer and member_id is None:
             return True
         
         return False

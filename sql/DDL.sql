@@ -461,7 +461,7 @@ CREATE TRIGGER trigger_prevent_class_overbooking
     FOR EACH ROW EXECUTE FUNCTION prevent_class_overbooking();
 
 -- Create Comments for Documentation
-COMMENT ON DATABASE IS 'Health and Fitness Club Management System';
+COMMENT ON DATABASE gym_db IS 'Health and Fitness Club Management System';
 
 COMMENT ON TABLE users IS 'Base user accounts with role-based access';
 COMMENT ON TABLE members IS 'Member profiles and personal information';

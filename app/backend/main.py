@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.db import engine, Base
 from core.config import settings
+from core.sessions import session_store
 
 from routes import members, trainers, admin, auth, health
 
@@ -31,9 +32,17 @@ app.include_router(admin.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Create database tables on startup"""
+    """Create database tables and start session cleanup on startup"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Start session cleanup background task
+    await session_store.start_cleanup_task()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop session cleanup on shutdown"""
+    await session_store.stop_cleanup_task()
 
 # Health check endpoint
 @app.get("/")
