@@ -1,76 +1,124 @@
 """
-Test configuration.
+Integration test configuration.
 
-Uses a PostgreSQL database (asyncpg) for tests.
-All models are created fresh for each test session.
+Tests run against the live Docker containers (backend on localhost:8000,
+postgres via docker exec). No SQLAlchemy in tests — pure HTTP.
+
+Cleanup: TRUNCATE all data tables before each test via docker exec psql.
 """
+import subprocess
 import pytest
-import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+import httpx
 
-from core.db import Base, get_db
-from core.sessions import token_blacklist
-from main import app
+BASE_URL = "http://localhost:8000"
 
-# ── PostgreSQL test engine ─────────────────────────────────────────────────
-TEST_DATABASE_URL = "postgresql+asyncpg://gym_user:gym_password@localhost:5432/gym_db"
-
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+TRUNCATE_SQL = (
+    "TRUNCATE enrollments, training_sessions, trainer_availability, "
+    "health_metrics, fitness_goals, payments, member_subscriptions, "
+    "equipments, classes, rooms, admin_staff, trainers, members, users "
+    "RESTART IDENTITY CASCADE;"
+)
 
 
-async def override_get_db():
-    async with TestSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+def _truncate():
+    """Truncate all data tables via docker exec."""
+    subprocess.run(
+        [
+            "docker", "exec", "app-postgres-1",
+            "psql", "-U", "gym_user", "-d", "gym_db", "-c", TRUNCATE_SQL,
+        ],
+        check=True,
+        capture_output=True,
+    )
 
 
-# ── fixtures ───────────────────────────────────────────────────────────────
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def create_tables():
-    """Create all tables once for the test session."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def reset_blacklist():
-    """Clear the JWT blacklist between tests."""
-    token_blacklist._blacklist.clear()
+@pytest.fixture(autouse=True)
+def clean_db():
+    """Wipe all data before every test."""
+    _truncate()
     yield
 
 
-@pytest_asyncio.fixture
-async def client():
-    """Async HTTP client wired to the FastAPI app with the test DB."""
-    app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.clear()
+@pytest.fixture
+def api():
+    """Synchronous httpx client pointed at the running backend."""
+    with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+        yield client
 
 
-# ── helpers ────────────────────────────────────────────────────────────────
+# ── shared helpers used across test modules ────────────────────────────────
 
-async def _register_and_login(client: AsyncClient, email: str, password: str, role: str):
-    """
-    Create a user directly via the service layer and return a valid JWT.
-    For members we use the /members/register endpoint.
-    For trainers/admins we create them directly via the service.
-    """
-    from tests.helpers import create_user_with_role
-    from sqlalchemy.ext.asyncio import AsyncSession
+def register_member(api: httpx.Client, email: str, password: str = "Pass123!",
+                    full_name: str = "Test Member") -> dict:
+    phone = f"555-{abs(hash(email)) % 10_000_000:07d}"
+    r = api.post("/members/register", json={
+        "email": email, "password": password,
+        "full_name": full_name, "date_of_birth": "1990-06-15",
+        "gender": "male", "phone": phone,
+    })
+    assert r.status_code == 200, f"register_member failed: {r.text}"
+    return r.json()["data"]
 
-    async with TestSessionLocal() as db:
-        await create_user_with_role(db, email, password, role)
 
-    resp = await client.post("/auth/login", json={"email": email, "password": password})
-    assert resp.status_code == 200, resp.text
-    return resp.json()["data"]["access_token"]
+def login(api: httpx.Client, email: str, password: str = "Pass123!") -> dict:
+    r = api.post("/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, f"login failed: {r.text}"
+    return r.json()["data"]  # {access_token, refresh_token, user, ...}
+
+
+def auth_headers(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def create_trainer_via_db(email: str, password: str = "Pass123!",
+                          full_name: str = "Test Trainer") -> None:
+    """Insert a trainer directly into the DB via docker exec psql."""
+    import bcrypt
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    # Use a single SQL statement to insert both rows atomically
+    sql = f"""
+DO $$
+DECLARE v_id UUID;
+BEGIN
+  INSERT INTO users (email, password, role) VALUES ('{email}', '{hashed}', 'trainer') RETURNING id INTO v_id;
+  INSERT INTO trainers (id, full_name) VALUES (v_id, '{full_name}');
+END $$;
+"""
+    subprocess.run(
+        ["docker", "exec", "app-postgres-1",
+         "psql", "-U", "gym_user", "-d", "gym_db", "-c", sql],
+        check=True, capture_output=True,
+    )
+
+
+def create_admin_via_db(email: str, password: str = "Pass123!",
+                        full_name: str = "Test Admin") -> None:
+    """Insert an admin directly into the DB via docker exec psql."""
+    import bcrypt
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    sql = f"""
+DO $$
+DECLARE v_id UUID;
+BEGIN
+  INSERT INTO users (email, password, role) VALUES ('{email}', '{hashed}', 'admin') RETURNING id INTO v_id;
+  INSERT INTO admin_staff (id, full_name) VALUES (v_id, '{full_name}');
+END $$;
+"""
+    subprocess.run(
+        ["docker", "exec", "app-postgres-1",
+         "psql", "-U", "gym_user", "-d", "gym_db", "-c", sql],
+        check=True, capture_output=True,
+    )
+
+
+def create_room_via_db(name: str = "Room A", capacity: int = 20) -> str:
+    """Insert a room and return its UUID."""
+    sql = f"SELECT id::text FROM rooms WHERE id = (INSERT INTO rooms (name, capacity) VALUES ('{name}', {capacity}) RETURNING id);"
+    # Use a CTE to get clean output
+    sql = f"WITH r AS (INSERT INTO rooms (name, capacity) VALUES ('{name}', {capacity}) RETURNING id) SELECT id::text FROM r;"
+    result = subprocess.run(
+        ["docker", "exec", "app-postgres-1",
+         "psql", "-U", "gym_user", "-d", "gym_db", "-t", "-A", "-c", sql],
+        capture_output=True, text=True, check=True,
+    )
+    return result.stdout.strip()

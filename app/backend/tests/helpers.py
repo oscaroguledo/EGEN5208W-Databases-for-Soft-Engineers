@@ -1,4 +1,4 @@
-"""Shared test helpers for creating users/members/trainers/admins directly in the DB."""
+"""Shared test helpers — insert users/rooms directly into the DB."""
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,12 +18,14 @@ async def create_user_with_role(db: AsyncSession, email: str, password: str, rol
     await db.refresh(user)
 
     if role == "member":
+        # Use a phone derived from email to stay unique across tests
+        phone = f"555-{abs(hash(email)) % 10_000_000:07d}"
         profile = Member(
             id=user.id,
             full_name="Test Member",
             date_of_birth=date(1990, 1, 1),
             gender="male",
-            phone=f"555-{email[:6].replace('@', '0')}",
+            phone=phone,
         )
         db.add(profile)
     elif role == "trainer":

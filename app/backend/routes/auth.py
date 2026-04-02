@@ -144,43 +144,6 @@ async def refresh(
         message="Token refreshed.",
     )
 
-
-@router.post("/logout-all", response_model=APIResponse[dict])
-async def logout_all(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Revoke the current access token.
-    Note: with stateless JWTs we can only revoke tokens we know about.
-    The client must discard all stored tokens on other devices.
-    """
-    # Reuse the same logic as /logout
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No token provided.",
-        )
-
-    token = credentials.credentials
-    payload = decode_access_token(token)
-
-    if await token_blacklist.is_blacklisted(token):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token already revoked.",
-        )
-
-    exp = payload.get("exp")
-    expires_at = datetime.utcfromtimestamp(exp) if exp else datetime.utcnow()
-    await token_blacklist.add(token, expires_at)
-
-    return APIResponse.success(
-        data={"revoked": True},
-        message="Current session revoked. Please logout on other devices manually.",
-    )
-
-
 @router.get("/me", response_model=APIResponse[dict])
 async def me(
     credentials: HTTPAuthorizationCredentials = Depends(security),

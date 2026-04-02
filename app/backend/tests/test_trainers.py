@@ -1,99 +1,102 @@
 """Tests for /trainers/* endpoints."""
-import pytest
-from httpx import AsyncClient
-from tests.conftest import TestSessionLocal
-from tests.helpers import create_user_with_role
-
-pytestmark = pytest.mark.asyncio
-
-_counter = 0
+import httpx
+from tests.conftest import (
+    login, auth_headers, register_member,
+    create_trainer_via_db, create_admin_via_db,
+)
 
 
-def _email(tag: str) -> str:
-    global _counter
-    _counter += 1
-    return f"tr_{tag}_{_counter}@test.com"
+# ── POST /trainers/availability ────────────────────────────────────────────
 
-
-async def _make_trainer(email: str, pw: str = "Pass123!") -> None:
-    async with TestSessionLocal() as db:
-        await create_user_with_role(db, email, pw, "trainer")
-
-
-async def _login(client: AsyncClient, email: str, pw: str = "Pass123!") -> str:
-    r = await client.post("/auth/login", json={"email": email, "password": pw})
+def test_set_availability(api: httpx.Client):
+    create_trainer_via_db("tr_avail@test.com")
+    token = login(api, "tr_avail@test.com")["access_token"]
+    r = api.post("/trainers/availability", json={
+        "available_date": "2027-05-01",
+        "start_at": "09:00",
+        "end_at": "12:00",
+    }, headers=auth_headers(token))
     assert r.status_code == 200, r.text
-    return r.json()["data"]["access_token"]
-
-
-# ── availability ───────────────────────────────────────────────────────────
-
-async def test_set_availability(client: AsyncClient):
-    email = _email("avail")
-    await _make_trainer(email)
-    token = await _login(client, email)
-    r = await client.post(
-        "/trainers/availability",
-        params={"available_date": "2026-05-01", "start_at": "09:00", "end_at": "12:00"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 200
     assert "availability_id" in r.json()["data"]
 
 
-async def test_set_availability_requires_trainer_role(client: AsyncClient):
-    """A member cannot set trainer availability."""
-    r_reg = await client.post("/members/register", json={
-        "email": _email("avail_mem"), "password": "Pass123!",
-        "full_name": "M", "date_of_birth": "1990-01-01",
-        "gender": "male", "phone": f"555-{_counter:06d}",
-    })
-    assert r_reg.status_code == 200
-    token = (await client.post("/auth/login", json={
-        "email": r_reg.json()["data"]["email"] if "email" in r_reg.json().get("data", {}) else _email("x"),
-        "password": "Pass123!",
-    })).json()["data"]["access_token"]
+def test_set_multiple_availability_slots(api: httpx.Client):
+    create_trainer_via_db("tr_avail2@test.com")
+    token = login(api, "tr_avail2@test.com")["access_token"]
+    headers = auth_headers(token)
+    for day in ["2027-05-01", "2027-05-02", "2027-05-03"]:
+        r = api.post("/trainers/availability", json={
+            "available_date": day, "start_at": "08:00", "end_at": "17:00",
+        }, headers=headers)
+        assert r.status_code == 200
 
-    # Re-login with the registered email
-    login_email = f"tr_avail_mem_{_counter}@test.com"
-    r_reg2 = await client.post("/members/register", json={
-        "email": login_email, "password": "Pass123!",
-        "full_name": "M2", "date_of_birth": "1990-01-01",
-        "gender": "male", "phone": f"555-{_counter+1:06d}",
-    })
-    token2 = (await client.post("/auth/login", json={"email": login_email, "password": "Pass123!"})).json()["data"]["access_token"]
 
-    r = await client.post(
-        "/trainers/availability",
-        params={"available_date": "2026-05-01", "start_at": "09:00", "end_at": "12:00"},
-        headers={"Authorization": f"Bearer {token2}"},
-    )
+def test_availability_requires_trainer_role(api: httpx.Client):
+    register_member(api, "mem_avail@test.com")
+    token = login(api, "mem_avail@test.com")["access_token"]
+    r = api.post("/trainers/availability", json={
+        "available_date": "2027-05-01", "start_at": "09:00", "end_at": "12:00",
+    }, headers=auth_headers(token))
     assert r.status_code == 403
 
 
-# ── schedule ───────────────────────────────────────────────────────────────
+def test_availability_requires_auth(api: httpx.Client):
+    r = api.post("/trainers/availability", json={
+        "available_date": "2027-05-01", "start_at": "09:00", "end_at": "12:00",
+    })
+    assert r.status_code == 401
 
-async def test_get_schedule(client: AsyncClient):
-    email = _email("sched")
-    await _make_trainer(email)
-    token = await _login(client, email)
-    r = await client.get("/trainers/schedule", headers={"Authorization": f"Bearer {token}"})
+
+# ── GET /trainers/schedule ─────────────────────────────────────────────────
+
+def test_get_schedule_empty(api: httpx.Client):
+    create_trainer_via_db("tr_sched@test.com")
+    token = login(api, "tr_sched@test.com")["access_token"]
+    r = api.get("/trainers/schedule", headers=auth_headers(token))
     assert r.status_code == 200
     data = r.json()["data"]
     assert "upcoming_sessions" in data
     assert "upcoming_classes" in data
+    assert "availability" in data
 
 
-async def test_get_schedule_unauthenticated(client: AsyncClient):
-    r = await client.get("/trainers/schedule")
-    assert r.status_code == 401
+def test_schedule_shows_availability(api: httpx.Client):
+    create_trainer_via_db("tr_sched2@test.com")
+    token = login(api, "tr_sched2@test.com")["access_token"]
+    headers = auth_headers(token)
+
+    api.post("/trainers/availability", json={
+        "available_date": "2027-06-01", "start_at": "09:00", "end_at": "17:00",
+    }, headers=headers)
+
+    r = api.get("/trainers/schedule", params={"days_ahead": 500}, headers=headers)
+    assert r.status_code == 200
+    assert len(r.json()["data"]["availability"]) >= 1
 
 
-# ── list trainers (admin only) ─────────────────────────────────────────────
+def test_schedule_unauthenticated(api: httpx.Client):
+    assert api.get("/trainers/schedule").status_code == 401
 
-async def test_list_trainers_requires_admin(client: AsyncClient):
-    email = _email("lst")
-    await _make_trainer(email)
-    token = await _login(client, email)
-    r = await client.get("/trainers/list", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 403
+
+def test_schedule_requires_trainer_role(api: httpx.Client):
+    register_member(api, "mem_sched@test.com")
+    token = login(api, "mem_sched@test.com")["access_token"]
+    assert api.get("/trainers/schedule", headers=auth_headers(token)).status_code == 403
+
+
+# ── GET /trainers/list (admin only) ───────────────────────────────────────
+
+def test_list_trainers_requires_admin(api: httpx.Client):
+    create_trainer_via_db("tr_lst@test.com")
+    token = login(api, "tr_lst@test.com")["access_token"]
+    assert api.get("/trainers/list", headers=auth_headers(token)).status_code == 403
+
+
+def test_list_trainers_as_admin(api: httpx.Client):
+    create_admin_via_db("admin_tr_lst@test.com")
+    create_trainer_via_db("tr_for_list@test.com")
+    token = login(api, "admin_tr_lst@test.com")["access_token"]
+    r = api.get("/trainers/list", headers=auth_headers(token))
+    assert r.status_code == 200
+    assert len(r.json()["data"]) >= 1
+    assert r.json()["data"][0]["full_name"] == "Test Trainer"

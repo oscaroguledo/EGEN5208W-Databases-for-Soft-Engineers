@@ -1,17 +1,14 @@
-"""Tests for /health and / endpoints."""
-import pytest
-from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
+"""Tests for / and /health/ endpoints."""
+import httpx
 
 
-async def test_root(client: AsyncClient):
-    r = await client.get("/")
+def test_root(api: httpx.Client):
+    r = api.get("/")
     assert r.status_code == 200
     assert r.json()["status"] == "running"
 
 
-async def test_health_check(client: AsyncClient):
-    r = await client.get("/health/")
+def test_health_check(api: httpx.Client):
+    r = api.get("/health/")
     assert r.status_code == 200
     assert r.json()["data"]["status"] == "healthy"

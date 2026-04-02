@@ -23,7 +23,6 @@ class Subscription(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     members = relationship("MemberSubscription", back_populates="subscription")
-    payments = relationship("Payment", back_populates="subscription")
     
     def __repr__(self):
         return f"<Subscription(id='{self.id}', plan='{self.plan}', fee='{self.fee}')>"
@@ -47,10 +46,11 @@ class MemberSubscription(Base):
     subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
-    status = Column(Enum(SubscriptionStatus), nullable=False, default=SubscriptionStatus.active)
+    status = Column(Enum(SubscriptionStatus, name="subscription_status", create_type=False), nullable=False, default=SubscriptionStatus.active)
 
     member = relationship("Member", back_populates="subscriptions")
     subscription = relationship("Subscription", back_populates="members")
+    payments = relationship("Payment", back_populates="subscription")
     
     def __repr__(self):
         return f"<MemberSubscription(id='{self.id}', member_id='{self.member_id}', subscription_id='{self.subscription_id}', start_date='{self.start_date}', end_date='{self.end_date}', status='{self.status}')>"

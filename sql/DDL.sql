@@ -440,18 +440,16 @@ DECLARE
     current_enrollments INTEGER;
     class_capacity INTEGER;
 BEGIN
-    -- Get current enrollment count and class capacity
-    SELECT COUNT(e.id), c.max_capacity
-    INTO current_enrollments, class_capacity
-    FROM enrollments e
-    JOIN classes c ON e.class_id = c.id
-    WHERE e.class_id = NEW.class_id;
-    
-    -- Check if adding this enrollment would exceed capacity
+    SELECT COUNT(e.id) INTO current_enrollments
+    FROM enrollments e WHERE e.class_id = NEW.class_id;
+
+    SELECT c.max_capacity INTO class_capacity
+    FROM classes c WHERE c.id = NEW.class_id;
+
     IF current_enrollments >= class_capacity THEN
         RAISE EXCEPTION 'Class is already at maximum capacity';
     END IF;
-    
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

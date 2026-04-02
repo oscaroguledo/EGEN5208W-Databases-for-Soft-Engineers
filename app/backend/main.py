@@ -6,6 +6,17 @@ from core.db import engine, Base
 from core.config import settings
 from core.sessions import token_blacklist
 
+# Import ALL models so SQLAlchemy mapper can resolve every relationship
+import models.users.user          # noqa: F401
+import models.users.members       # noqa: F401
+import models.users.trainers      # noqa: F401
+import models.users.admin_staff   # noqa: F401
+import models.subscriptions       # noqa: F401
+import models.goals               # noqa: F401
+import models.payments            # noqa: F401
+import models.equipments          # noqa: F401
+import models.trainings           # noqa: F401
+
 from routes import members, trainers, admin, auth, health
 
 

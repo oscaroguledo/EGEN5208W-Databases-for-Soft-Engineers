@@ -128,7 +128,7 @@ class TrainingSession(Base):
     session_date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    status = Column(Enum(SessionStatus), nullable=False, default=SessionStatus.scheduled)
+    status = Column(Enum(SessionStatus, name="session_status", create_type=False), nullable=False, default=SessionStatus.scheduled)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     trainer = relationship("Trainer", back_populates="training_sessions")

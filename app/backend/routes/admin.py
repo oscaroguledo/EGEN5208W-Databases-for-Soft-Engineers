@@ -134,7 +134,7 @@ async def get_all_equipment(
     return APIResponse(
         status="success",
         message="Equipment list retrieved with pagination",
-        data=equipment_list,
+        data=[e.to_dict() for e in equipment_list],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,
@@ -165,7 +165,7 @@ async def list_equipment_paginated(
     return APIResponse(
         status="success",
         message="Equipment list retrieved with pagination",
-        data=equipment_list,
+        data=[e.to_dict() for e in equipment_list],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,
@@ -320,7 +320,7 @@ async def update_equipment(
         if data.notes is not None:
             update_data["maintenance_notes"] = data.notes
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            pass  # updated_at is handled by the service layer
         
         equipment = await EquipmentService.update_equipment(
             db=db,
@@ -390,7 +390,7 @@ async def list_training_sessions(
         limit=limit,
         member_id=member_id,
         trainer_id=trainer_id,
-        status=status_filter
+        status_filter=status_filter
     )
     
     total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -398,7 +398,7 @@ async def list_training_sessions(
     return APIResponse(
         status="success",
         message="Training sessions list retrieved with pagination",
-        data=sessions,
+        data=[s.to_dict() for s in sessions],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,
@@ -425,7 +425,7 @@ async def list_payments(
         limit=limit,
         member_id=member_id,
         subscription_id=subscription_id,
-        status=status_filter
+        status_filter=status_filter
     )
     
     total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -433,7 +433,7 @@ async def list_payments(
     return APIResponse(
         status="success",
         message="Payments list retrieved with pagination",
-        data=payments,
+        data=[p.to_dict() for p in payments],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,

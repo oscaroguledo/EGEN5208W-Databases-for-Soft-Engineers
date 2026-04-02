@@ -21,7 +21,7 @@ class Member(Base):
     id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     full_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=False)
-    gender = Column(Enum(Gender), nullable=False)
+    gender = Column(Enum(Gender, name="gender", create_type=False), nullable=False)
     phone = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

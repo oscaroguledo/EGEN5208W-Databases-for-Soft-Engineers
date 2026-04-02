@@ -16,14 +16,14 @@ class Payment(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     member_id = Column(UUID(as_uuid=True), ForeignKey("members.id"), nullable=False)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=False)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("member_subscriptions.id"), nullable=False)
     amount = Column(DECIMAL(10,2), nullable=False)
     paid_at = Column(DateTime, nullable=False)
     payment_method = Column(String(100), nullable=False)
-    status = Column(Enum(PaymentStatus), nullable=False, default=PaymentStatus.pending)
+    status = Column(Enum(PaymentStatus, name="payment_status", create_type=False), nullable=False, default=PaymentStatus.pending)
 
     member = relationship("Member", back_populates="payments")
-    subscription = relationship("Subscription", back_populates="payments")
+    subscription = relationship("MemberSubscription", back_populates="payments")
     
     def __repr__(self):
         return f"<Payment(id='{self.id}', member_id='{self.member_id}', subscription_id='{self.subscription_id}', amount='{self.amount}', paid_at='{self.paid_at}', payment_method='{self.payment_method}', status='{self.status}')>"

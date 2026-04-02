@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
@@ -26,8 +26,8 @@ class RegisterMemberBody(BaseModel):
 
 
 class UpdateMemberBody(BaseModel):
-    full_name: str | None = None
-    phone: str | None = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
 
 
 # ── routes ─────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ async def update_fitness_goals(
 async def list_fitness_goals(
     skip: int = 0,
     limit: int = 20,
-    member_id: UUID | None = None,
+    member_id: Optional[UUID] = None,
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db),
 ):
@@ -106,7 +106,7 @@ async def list_fitness_goals(
 async def get_health_history(
     skip: int = 0,
     limit: int = 100,
-    metric_type: str | None = None,
+    metric_type: Optional[str] = None,
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db),
 ):
@@ -137,7 +137,7 @@ async def add_health_metric(
 async def list_available_classes(
     skip: int = 0,
     limit: int = 100,
-    class_date: str | None = None,
+    class_date: Optional[str] = None,
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db),
 ):
@@ -236,7 +236,7 @@ async def get_member_dashboard_optimized(
 async def list_members(
     skip: int = 0,
     limit: int = 20,
-    gender: str | None = None,
+    gender: Optional[str] = None,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):

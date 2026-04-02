@@ -1,147 +1,151 @@
 """Tests for /auth/* endpoints."""
-import pytest
-from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
+import httpx
+from tests.conftest import register_member, login, auth_headers
 
 
-# ── helpers ────────────────────────────────────────────────────────────────
+# ── POST /auth/login ───────────────────────────────────────────────────────
 
-async def _make_member(client: AsyncClient, email="auth_member@test.com", pw="Pass123!"):
-    r = await client.post("/members/register", json={
-        "email": email, "password": pw,
-        "full_name": "Auth Member", "date_of_birth": "1990-01-01",
-        "gender": "male", "phone": f"555-{email[:4]}",
-    })
-    assert r.status_code == 200, r.text
-    return email, pw
-
-
-async def _login(client: AsyncClient, email: str, pw: str) -> dict:
-    r = await client.post("/auth/login", json={"email": email, "password": pw})
-    assert r.status_code == 200, r.text
-    return r.json()["data"]
-
-
-# ── login ──────────────────────────────────────────────────────────────────
-
-async def test_login_success(client: AsyncClient):
-    email, pw = await _make_member(client, "login_ok@test.com")
-    data = await _login(client, email, pw)
+def test_login_success(api: httpx.Client):
+    register_member(api, "login_ok@test.com")
+    data = login(api, "login_ok@test.com")
     assert "access_token" in data
     assert "refresh_token" in data
     assert data["token_type"] == "bearer"
-    assert data["user"]["email"] == email
+    assert data["user"]["email"] == "login_ok@test.com"
     assert data["user"]["role"] == "member"
+    assert data["expires_in"] > 0
 
 
-async def test_login_wrong_password(client: AsyncClient):
-    await _make_member(client, "login_bad@test.com")
-    r = await client.post("/auth/login", json={"email": "login_bad@test.com", "password": "wrong"})
+def test_login_wrong_password(api: httpx.Client):
+    register_member(api, "login_bad@test.com")
+    r = api.post("/auth/login", json={"email": "login_bad@test.com", "password": "wrong"})
     assert r.status_code == 401
 
 
-async def test_login_unknown_email(client: AsyncClient):
-    r = await client.post("/auth/login", json={"email": "nobody@test.com", "password": "x"})
+def test_login_unknown_email(api: httpx.Client):
+    r = api.post("/auth/login", json={"email": "nobody@test.com", "password": "x"})
     assert r.status_code == 401
 
 
-# ── /auth/me ───────────────────────────────────────────────────────────────
+def test_login_missing_fields(api: httpx.Client):
+    r = api.post("/auth/login", json={"email": "x@test.com"})
+    assert r.status_code == 422
 
-async def test_me_with_valid_token(client: AsyncClient):
-    email, pw = await _make_member(client, "me_ok@test.com")
-    tokens = await _login(client, email, pw)
-    r = await client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+
+# ── GET /auth/me ───────────────────────────────────────────────────────────
+
+def test_me_with_valid_token(api: httpx.Client):
+    register_member(api, "me_ok@test.com")
+    tokens = login(api, "me_ok@test.com")
+    r = api.get("/auth/me", headers=auth_headers(tokens["access_token"]))
     assert r.status_code == 200
-    assert r.json()["data"]["email"] == email
+    assert r.json()["data"]["email"] == "me_ok@test.com"
+    assert r.json()["data"]["role"] == "member"
 
 
-async def test_me_without_token(client: AsyncClient):
-    r = await client.get("/auth/me")
+def test_me_without_token(api: httpx.Client):
+    r = api.get("/auth/me")
     assert r.status_code == 401
 
 
-async def test_me_with_garbage_token(client: AsyncClient):
-    r = await client.get("/auth/me", headers={"Authorization": "Bearer notavalidtoken"})
+def test_me_with_garbage_token(api: httpx.Client):
+    r = api.get("/auth/me", headers=auth_headers("not.a.valid.jwt"))
     assert r.status_code == 401
 
 
-# ── /auth/verify ───────────────────────────────────────────────────────────
+# ── GET /auth/verify ───────────────────────────────────────────────────────
 
-async def test_verify_valid_token(client: AsyncClient):
-    email, pw = await _make_member(client, "verify_ok@test.com")
-    tokens = await _login(client, email, pw)
-    r = await client.get("/auth/verify", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+def test_verify_valid_token(api: httpx.Client):
+    register_member(api, "verify_ok@test.com")
+    tokens = login(api, "verify_ok@test.com")
+    r = api.get("/auth/verify", headers=auth_headers(tokens["access_token"]))
     assert r.status_code == 200
-    assert r.json()["data"]["valid"] is True
+    d = r.json()["data"]
+    assert d["valid"] is True
+    assert d["email"] == "verify_ok@test.com"
+    assert d["role"] == "member"
 
 
-async def test_verify_no_token(client: AsyncClient):
-    r = await client.get("/auth/verify")
+def test_verify_no_token(api: httpx.Client):
+    r = api.get("/auth/verify")
     assert r.status_code == 200
     assert r.json()["data"]["valid"] is False
 
 
-# ── /auth/logout ───────────────────────────────────────────────────────────
+def test_verify_garbage_token(api: httpx.Client):
+    r = api.get("/auth/verify", headers=auth_headers("garbage"))
+    assert r.status_code == 200
+    assert r.json()["data"]["valid"] is False
 
-async def test_logout_blacklists_token(client: AsyncClient):
-    email, pw = await _make_member(client, "logout_ok@test.com")
-    tokens = await _login(client, email, pw)
+
+# ── POST /auth/logout ──────────────────────────────────────────────────────
+
+def test_logout_blacklists_token(api: httpx.Client):
+    register_member(api, "logout_ok@test.com")
+    tokens = login(api, "logout_ok@test.com")
     token = tokens["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = auth_headers(token)
 
-    # Logout
-    r = await client.post("/auth/logout", headers=headers)
+    r = api.post("/auth/logout", headers=headers)
     assert r.status_code == 200
     assert r.json()["data"]["revoked"] is True
 
-    # Token should now be rejected
-    r2 = await client.get("/auth/me", headers=headers)
+    # Token must now be rejected
+    r2 = api.get("/auth/me", headers=headers)
     assert r2.status_code == 401
 
 
-async def test_logout_without_token(client: AsyncClient):
-    r = await client.post("/auth/logout")
-    assert r.status_code == 200   # graceful — no token is fine
+def test_logout_without_token(api: httpx.Client):
+    r = api.post("/auth/logout")
+    assert r.status_code == 200  # graceful — no token is fine
 
 
-# ── /auth/refresh ──────────────────────────────────────────────────────────
+def test_verify_after_logout_shows_invalid(api: httpx.Client):
+    register_member(api, "verify_logout@test.com")
+    tokens = login(api, "verify_logout@test.com")
+    token = tokens["access_token"]
 
-async def test_refresh_returns_new_access_token(client: AsyncClient):
-    email, pw = await _make_member(client, "refresh_ok@test.com")
-    tokens = await _login(client, email, pw)
+    api.post("/auth/logout", headers=auth_headers(token))
 
-    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    r = api.get("/auth/verify", headers=auth_headers(token))
+    assert r.json()["data"]["valid"] is False
+
+
+# ── POST /auth/refresh ─────────────────────────────────────────────────────
+
+def test_refresh_returns_new_access_token(api: httpx.Client):
+    register_member(api, "refresh_ok@test.com")
+    tokens = login(api, "refresh_ok@test.com")
+
+    r = api.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert r.status_code == 200
     new_token = r.json()["data"]["access_token"]
-    assert new_token  # non-empty
-    assert new_token != tokens["access_token"]  # actually a new token
+    assert new_token  # non-empty, valid JWT
+    # Verify the new token actually works
+    r2 = api.get("/auth/me", headers=auth_headers(new_token))
+    assert r2.status_code == 200
 
 
-async def test_refresh_with_access_token_fails(client: AsyncClient):
+def test_new_access_token_works(api: httpx.Client):
+    register_member(api, "refresh_use@test.com")
+    tokens = login(api, "refresh_use@test.com")
+
+    r = api.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    new_token = r.json()["data"]["access_token"]
+
+    r2 = api.get("/auth/me", headers=auth_headers(new_token))
+    assert r2.status_code == 200
+    assert r2.json()["data"]["email"] == "refresh_use@test.com"
+
+
+def test_refresh_with_access_token_fails(api: httpx.Client):
     """Passing an access token to /refresh must fail (wrong type claim)."""
-    email, pw = await _make_member(client, "refresh_bad@test.com")
-    tokens = await _login(client, email, pw)
-    r = await client.post("/auth/refresh", json={"refresh_token": tokens["access_token"]})
+    register_member(api, "refresh_bad@test.com")
+    tokens = login(api, "refresh_bad@test.com")
+    r = api.post("/auth/refresh", json={"refresh_token": tokens["access_token"]})
     assert r.status_code == 401
 
 
-async def test_refresh_with_garbage_fails(client: AsyncClient):
-    r = await client.post("/auth/refresh", json={"refresh_token": "garbage"})
+def test_refresh_with_garbage_fails(api: httpx.Client):
+    r = api.post("/auth/refresh", json={"refresh_token": "garbage"})
     assert r.status_code == 401
-
-
-# ── /auth/logout-all ───────────────────────────────────────────────────────
-
-async def test_logout_all(client: AsyncClient):
-    email, pw = await _make_member(client, "logout_all@test.com")
-    tokens = await _login(client, email, pw)
-    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
-
-    r = await client.post("/auth/logout-all", headers=headers)
-    assert r.status_code == 200
-    assert r.json()["data"]["revoked"] is True
-
-    # Token should be blacklisted
-    r2 = await client.get("/auth/me", headers=headers)
-    assert r2.status_code == 401

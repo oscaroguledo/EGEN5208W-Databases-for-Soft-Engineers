@@ -108,7 +108,7 @@ async def list_trainers(
     return APIResponse(
         status="success",
         message="Trainers list retrieved with pagination",
-        data=trainers,
+        data=[t.to_dict() for t in trainers],
         pagination=Pagination(
             total=total,
             page=(skip // limit) + 1,

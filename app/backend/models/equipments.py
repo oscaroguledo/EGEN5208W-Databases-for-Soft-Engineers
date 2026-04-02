@@ -16,7 +16,7 @@ class Equipment(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"), nullable=False)
     equipment_name = Column(String, nullable=False)
-    status = Column(Enum(EquipmentStatus), nullable=False, default=EquipmentStatus.operational)
+    status = Column(Enum(EquipmentStatus, name="equipment_status", create_type=False), nullable=False, default=EquipmentStatus.operational)
     maintenance_notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
