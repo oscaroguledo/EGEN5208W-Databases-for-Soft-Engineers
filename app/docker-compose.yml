@@ -5,7 +5,7 @@ services:
       context: ./frontend
       dockerfile: ${DOCKERFILE:-Dockerfile}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
