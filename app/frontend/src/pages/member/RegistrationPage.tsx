@@ -12,6 +12,7 @@ interface RegistrationPageProps {
   users: User[];
   members: Member[];
   onRegister: (user: User, member: Member) => void;
+  onGoBack?: () => void;
 }
 
 interface FormState {
@@ -51,7 +52,8 @@ const isValidEmail = (email: string) =>
 export function RegistrationPage({
   users,
   members,
-  onRegister
+  onRegister,
+  onGoBack
 }: RegistrationPageProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<FormState>>({});
@@ -358,6 +360,11 @@ export function RegistrationPage({
               <Button type="button" variant="secondary" onClick={handleClear}>
                 Clear Form
               </Button>
+              {onGoBack && (
+                <Button type="button" variant="ghost" onClick={onGoBack}>
+                  Back to Login
+                </Button>
+              )}
             </div>
           </form>
         </Card>
