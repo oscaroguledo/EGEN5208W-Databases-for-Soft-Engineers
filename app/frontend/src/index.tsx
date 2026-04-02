@@ -15,9 +15,9 @@ root.render(
         richColors
         toastOptions={{
           style: {
-            background: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            color: 'hsl(var(--foreground))'
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            color: '#1e293b'
           }
         }}
       />
