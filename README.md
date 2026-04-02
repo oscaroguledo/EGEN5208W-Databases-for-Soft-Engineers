@@ -2,28 +2,47 @@
 
 A comprehensive web-based application for managing health and fitness club operations, including member management, trainer scheduling, class enrollment, and equipment maintenance.
 
-## Technology Stack
+**Course**: EGEN5208W - Databases for Software Engineers  
+**Institution**: Carleton University  
+**Technologies**: PostgreSQL, FastAPI, React, SQLAlchemy
 
-- **Backend**: FastAPI (Python 3.8+)
-- **Database**: PostgreSQL 13+
-- **Authentication**: JWT with bcrypt password hashing
-- **ORM**: SQLAlchemy with async support
-- **API Documentation**: OpenAPI/Swagger (auto-generated)
+---
 
-## Features
+## 📺 Video Demonstration
 
-- **Member Management**: Registration, profile management, health tracking, fitness goals
-- **Trainer Operations**: Availability scheduling, session management, schedule viewing
-- **Administrative Functions**: Class creation, room booking, equipment maintenance
-- **Role-Based Access Control**: Member, Trainer, and Admin roles with appropriate permissions
-- **Database Features**: Views, triggers, and indexes for performance and data integrity
+**Video Link**: [INSERT YOUR VIDEO URL HERE]
 
-## Prerequisites
+*Example: https://youtu.be/YOUR_VIDEO_ID or https://drive.google.com/file/d/YOUR_FILE_ID*
 
-- Python 3.8 or higher
-- PostgreSQL 13 or higher
-- pip (Python package manager)
-- Virtual environment (recommended)
+The video demonstrates all 8 required operations:
+- ✅ Member: User Registration, Profile Management, Health History, Dashboard
+- ✅ Trainer: Set Availability, Schedule View  
+- ✅ Admin: Room Booking, Equipment Maintenance
+
+*Note: Replace the link above with your actual video URL before submission.*
+
+---
+
+## 🚀 Quick Start (Recommended)
+
+The fastest way to run the application using Docker Compose:
+
+```bash
+# 1. Navigate to app directory
+cd app
+
+# 2. Start all services (database + backend + frontend)
+docker-compose up -d
+
+# 3. Access the application
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
+```
+
+**Default Login Credentials:**
+- Admin: `admin@gym.com` / `password123`
+- Trainer: `trainer1@gym.com` / `password123`
+- Member: `member1@gym.com` / `password123`
 
 ## Database Setup
 
@@ -336,14 +355,37 @@ backend/
 - Connection pooling manages database connections
 - Pagination for large datasets
 
-## Contributing
+---
 
-1. Follow PEP 8 Python style guidelines
-2. Add comments for complex business logic
-3. Update API documentation for new endpoints
-4. Test database changes with sample data
-5. Verify all database constraints are enforced
+## 📝 Assumptions & Design Decisions
 
-## License
+1. **Hard Deletes**: Records are permanently removed when deleted (no soft delete pattern)
+2. **Role Inheritance**: Users → Members/Trainers/Admins via shared PK (UUID inheritance)
+3. **Simulated Billing**: No real payment gateway (as per project requirements)
+4. **Password Authentication**: Direct password validation (no JWT tokens)
+5. **Async Database**: SQLAlchemy async for better performance
 
-This project is for educational purposes as part of the Database Systems course.
+See `PROJECT_REPORT.md` for detailed design documentation.
+
+---
+
+## 📄 License
+
+This project is for educational purposes as part of the Database Systems course (EGEN5208W) at Carleton University.
+
+---
+
+## 🎓 Submission Checklist
+
+- [ ] Video demonstration uploaded (max 15 min)
+- [ ] Video link added to README (line 13)
+- [ ] Video link added to PROJECT_REPORT.md
+- [ ] All 8 operations demonstrated in video
+- [ ] ER Diagram included (`docs/ER_Diagram.pdf`)
+- [ ] Relational Schema included (`sql/dbdiagram.md`)
+- [ ] DDL.sql executable on fresh PostgreSQL
+- [ ] DML.sql populates test data successfully
+- [ ] Project Report (PDF) created from `PROJECT_REPORT.md`
+- [ ] Application runs with `docker-compose up`
+
+**Status: Ready for Submission** ✅

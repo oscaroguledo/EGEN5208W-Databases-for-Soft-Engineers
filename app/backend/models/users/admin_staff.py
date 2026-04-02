@@ -13,7 +13,6 @@ class AdminStaff(Base):
     full_name = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="admin_staff")
     
@@ -26,5 +25,4 @@ class AdminStaff(Base):
             "full_name": self.full_name,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
         }

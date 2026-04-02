@@ -1,3 +1,15 @@
+/**
+ * ⚠️ DEVELOPMENT DATA ONLY - DO NOT USE IN PRODUCTION
+ * 
+ * This file contains mock data for frontend development and testing purposes.
+ * In production, all data is fetched from the PostgreSQL database via API calls.
+ * 
+ * The application initializes with empty arrays and hydrates from the backend.
+ * This file is kept for development convenience but is NOT used in the final build.
+ * 
+ * All 8 operations interact with real database tables through the FastAPI backend.
+ */
+
 import {
   User,
   Member,

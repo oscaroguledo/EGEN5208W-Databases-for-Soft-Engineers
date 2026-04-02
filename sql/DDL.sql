@@ -33,8 +33,7 @@ CREATE TABLE members (
     gender gender NOT NULL,
     phone VARCHAR(50) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Trainers Table
@@ -42,8 +41,7 @@ CREATE TABLE trainers (
     id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     full_name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Admin Staff Table
@@ -51,8 +49,7 @@ CREATE TABLE admin_staff (
     id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     full_name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Subscriptions Table
@@ -113,8 +110,7 @@ CREATE TABLE equipments (
     status equipment_status NOT NULL DEFAULT 'operational',
     maintenance_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Trainer Availability Table
@@ -137,8 +133,7 @@ CREATE TABLE classes (
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     max_capacity INTEGER NOT NULL DEFAULT 20,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Enrollments Table
@@ -171,7 +166,6 @@ CREATE TABLE payments (
     amount DECIMAL(10,2) NOT NULL,
     paid_at TIMESTAMP WITH TIME ZONE NOT NULL,
     payment_method VARCHAR(100) NOT NULL,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     status payment_status NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -181,9 +175,6 @@ CREATE TABLE payments (
 -- Users and Roles
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_members_phone ON members(phone);
-CREATE INDEX idx_members_deleted_at ON members(deleted_at);
-CREATE INDEX idx_trainers_deleted_at ON trainers(deleted_at);
-CREATE INDEX idx_admins_deleted_at ON admin_staff(deleted_at);
 
 -- Subscriptions and Payments
 CREATE INDEX idx_member_subscriptions_member_id ON member_subscriptions(member_id);
@@ -209,7 +200,6 @@ CREATE INDEX idx_trainer_availability_trainer_date ON trainer_availability(train
 CREATE INDEX idx_classes_trainer_id ON classes(trainer_id);
 CREATE INDEX idx_classes_room_id ON classes(room_id);
 CREATE INDEX idx_classes_date ON classes(class_date);
-CREATE INDEX idx_classes_deleted_at ON classes(deleted_at);
 CREATE INDEX idx_classes_trainer_date_time ON classes(trainer_id, class_date, start_time);
 CREATE INDEX idx_classes_room_date_time ON classes(room_id, class_date, start_time);
 CREATE INDEX idx_enrollments_member_id ON enrollments(member_id);
@@ -229,7 +219,6 @@ CREATE INDEX idx_training_sessions_member_date ON training_sessions(member_id, s
 -- Equipment
 CREATE INDEX idx_equipments_room_id ON equipments(room_id);
 CREATE INDEX idx_equipments_status ON equipments(status);
-CREATE INDEX idx_equipments_deleted_at ON equipments(deleted_at);
 
 -- Create Unique Constraints
 ALTER TABLE enrollments ADD CONSTRAINT enrollments_class_member_unique UNIQUE (class_id, member_id);
@@ -266,7 +255,6 @@ LEFT JOIN classes c ON e.class_id = c.id
 LEFT JOIN training_sessions ts ON m.id = ts.member_id
 LEFT JOIN trainers t ON ts.trainer_id = t.id
 LEFT JOIN rooms r ON ts.room_id = r.id
-WHERE m.deleted_at IS NULL
 GROUP BY m.id, m.full_name, u.email, hm.metric_type, hm.metric_value, hm.recorded_at, 
          fg.description, fg.target_value, ts.session_date, ts.start_time, ts.end_time, 
          t.full_name, r.name, c.name, c.class_date, c.start_time, c.end_time;
@@ -287,8 +275,7 @@ FROM trainers t
 LEFT JOIN training_sessions ts ON t.id = ts.trainer_id
 LEFT JOIN members m ON ts.member_id = m.id
 LEFT JOIN rooms r ON ts.room_id = r.id
-WHERE t.deleted_at IS NULL
-AND ts.session_date >= CURRENT_DATE
+WHERE ts.session_date >= CURRENT_DATE
 AND ts.status IN ('scheduled', 'completed')
 
 UNION ALL
@@ -306,9 +293,7 @@ SELECT
 FROM trainers t
 LEFT JOIN classes c ON t.id = c.trainer_id
 LEFT JOIN rooms r ON c.room_id = r.id
-WHERE t.deleted_at IS NULL
-AND c.class_date >= CURRENT_DATE
-AND c.deleted_at IS NULL
+WHERE c.class_date >= CURRENT_DATE
 ORDER BY session_date, start_time;
 
 -- Equipment Maintenance View
@@ -328,7 +313,6 @@ SELECT
     END as maintenance_status
 FROM equipments e
 LEFT JOIN rooms r ON e.room_id = r.id
-WHERE e.deleted_at IS NULL
 ORDER BY 
     CASE 
         WHEN e.status = 'under_repair' THEN 1

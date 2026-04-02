@@ -1,18 +1,31 @@
 from typing import Optional
 from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+from passlib.context import CryptContext
 
 from core.db import get_db
 from models.users.user import User, UserRole
 from services.users.user import UserService
 
-security = HTTPBearer()
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBasic(auto_error=False)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against a hashed password"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password"""
+    return pwd_context.hash(password)
+
 
 class RoleChecker:
     """
     Role-based access control dependency for FastAPI
+    Uses email/password authentication (no JWT tokens)
     """
     
     def __init__(self, allowed_roles: list[UserRole]):
@@ -20,43 +33,43 @@ class RoleChecker:
     
     async def __call__(
         self,
-        credentials: HTTPAuthorizationCredentials = Depends(security),
+        credentials: Optional[HTTPBasicCredentials] = Depends(security),
         db: AsyncSession = Depends(get_db)
     ) -> User:
         """
-        Check if the current user has the required role
+        Authenticate user with email/password and check role
         """
         if not credentials:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated"
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Basic"},
             )
         
-        # For demo purposes, we'll use a simple token-based auth
-        # In production, you'd decode JWT tokens here
-        try:
-            user_id = UUID(credentials.credentials)
-            user = await UserService.get_user(db, user_id)
-            
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found"
-                )
-            
-            if user.role not in self.allowed_roles:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied. Required roles: {[role.value for role in self.allowed_roles]}"
-                )
-            
-            return user
-            
-        except (ValueError, TypeError):
+        # Authenticate with email and password
+        user = await UserService.get_user_by_email(db, credentials.username)
+        
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication token"
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Basic"},
             )
+        
+        if not verify_password(credentials.password, user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        
+        if user.role not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required roles: {[role.value for role in self.allowed_roles]}"
+            )
+        
+        return user
 
 # Predefined role checkers for common use cases
 require_member = RoleChecker([UserRole.member])

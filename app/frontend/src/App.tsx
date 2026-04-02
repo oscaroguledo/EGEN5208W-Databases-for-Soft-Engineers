@@ -2,32 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layout } from './components/Layout';
 import { PageTransition } from './components/PageTransition';
-import {
-  User,
-  Member,
-  Trainer,
-  Room,
-  FitnessGoal,
-  HealthMetric,
-  TrainerAvailability,
-  GroupClass,
-  ClassRegistration,
-  PersonalSession,
-  Equipment } from
-'./data/types';
-import {
-  INITIAL_USERS,
-  INITIAL_MEMBERS,
-  INITIAL_TRAINERS,
-  INITIAL_ROOMS,
-  INITIAL_FITNESS_GOALS,
-  INITIAL_HEALTH_METRICS,
-  INITIAL_TRAINER_AVAILABILITY,
-  INITIAL_GROUP_CLASSES,
-  INITIAL_CLASS_REGISTRATIONS,
-  INITIAL_PERSONAL_SESSIONS,
-  INITIAL_EQUIPMENT } from
-'./data/initialData';
+import { User, Member, Trainer, Room, FitnessGoal, HealthMetric, TrainerAvailability, GroupClass, ClassRegistration, PersonalSession, Equipment } from './data/types';
 import { toast } from 'sonner';
 // ─── Maintenance mode flag ────────────────────────────────────────────────────
 // Set to true to show the maintenance page for all users
@@ -185,29 +160,17 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('login');
   const [previousPage, setPreviousPage] = useState<Page | null>(null);
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
-  const [trainers, setTrainers] = useState<Trainer[]>(INITIAL_TRAINERS);
-  const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS);
-  const [fitnessGoals, setFitnessGoals] = useState<FitnessGoal[]>(
-    INITIAL_FITNESS_GOALS
-  );
-  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>(
-    INITIAL_HEALTH_METRICS
-  );
-  const [trainerAvailability, setTrainerAvailability] = useState<
-    TrainerAvailability[]>(
-    INITIAL_TRAINER_AVAILABILITY);
-  const [groupClasses, setGroupClasses] = useState<GroupClass[]>(
-    INITIAL_GROUP_CLASSES
-  );
-  const [classRegistrations, setClassRegistrations] = useState<
-    ClassRegistration[]>(
-    INITIAL_CLASS_REGISTRATIONS);
-  const [personalSessions, setPersonalSessions] = useState<PersonalSession[]>(
-    INITIAL_PERSONAL_SESSIONS
-  );
-  const [equipment, setEquipment] = useState<Equipment[]>(INITIAL_EQUIPMENT);
+  const [users, setUsers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [fitnessGoals, setFitnessGoals] = useState<FitnessGoal[]>([]);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
+  const [trainerAvailability, setTrainerAvailability] = useState<TrainerAvailability[]>([]);
+  const [groupClasses, setGroupClasses] = useState<GroupClass[]>([]);
+  const [classRegistrations, setClassRegistrations] = useState<ClassRegistration[]>([]);
+  const [personalSessions, setPersonalSessions] = useState<PersonalSession[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   // ─── API hydration: replace local fixtures with backend data when available
   useEffect(() => {
     let mounted = true;
@@ -332,31 +295,14 @@ export function App() {
   const handleAddSession = (s: PersonalSession) =>
   setPersonalSessions((ss) => [...ss, s]);
   const handleBookSession = async (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; notes?: string }) => {
-    try {
-      const membersApi = await import('./apis/members');
-      const res = await membersApi.bookSession(payload);
-      const created = res && (res.session || res);
-      if (created) {
-        setPersonalSessions((ss) => [...ss, created as PersonalSession]);
-        return created;
-      }
-    } catch (err) {
-      // fallback to local creation
+    const membersApi = await import('./apis/members');
+    const res = await membersApi.bookSession(payload);
+    const created = res && (res.session || res);
+    if (created) {
+      setPersonalSessions((ss) => [...ss, created as PersonalSession]);
+      return created;
     }
-    const newId = Math.max(...personalSessions.map((s) => s.session_id), 0) + 1;
-    const created: PersonalSession = {
-      session_id: newId,
-      member_id: currentUser ? currentUser.user_id : -1,
-      trainer_id: parseInt(payload.trainer_id),
-      room_id: parseInt(payload.room_id),
-      session_date: payload.session_date,
-      start_time: payload.start_time,
-      end_time: payload.end_time,
-      status: 'scheduled',
-      notes: payload.notes || ''
-    };
-    setPersonalSessions((ss) => [...ss, created]);
-    return created;
+    throw new Error('Failed to book session');
   };
   const handleUpdateClass = (c: GroupClass) =>
   setGroupClasses((cs) => cs.map((x) => x.class_id === c.class_id ? c : x));

@@ -47,14 +47,13 @@ class Class(Base):
     end_time = Column(Time, nullable=False)
     max_capacity = Column(Integer, nullable=False, default=20)
     created_at = Column(DateTime, default=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
 
     trainer = relationship("Trainer", back_populates="classes")
     room = relationship("Room", back_populates="classes")
     enrollments = relationship("Enrollment", back_populates="class_")
 
     def __repr__(self):
-        return f"<Class(id='{self.id}', name='{self.name}', trainer_id='{self.trainer_id}', room_id='{self.room_id}', class_date='{self.class_date}', start_time='{self.start_time}', end_time='{self.end_time}', max_capacity='{self.max_capacity}', created_at='{self.created_at}', deleted_at='{self.deleted_at}')>"
+        return f"<Class(id='{self.id}', name='{self.name}', trainer_id='{self.trainer_id}', room_id='{self.room_id}', class_date='{self.class_date}', start_time='{self.start_time}', end_time='{self.end_time}', max_capacity='{self.max_capacity}', created_at='{self.created_at}')>"
 
     def to_dict(self):
         return {
@@ -67,7 +66,6 @@ class Class(Base):
             "end_time": self.end_time.isoformat() if self.end_time else None,
             "max_capacity": self.max_capacity,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
         }
 
 class Enrollment(Base):
