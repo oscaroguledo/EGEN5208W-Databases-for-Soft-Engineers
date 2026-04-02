@@ -8,13 +8,13 @@ from core.db import get_db
 from core.auth import require_member, PermissionChecker
 from core.response import APIResponse, Pagination
 from models.users.user import User, UserRole
-from models.users.members import Member
+from schemas.users import MemberResponse, MemberCreate, MemberProfileUpdate
 
 from services.users.members import MemberService
 
 router = APIRouter(prefix="/members", tags=["members"])
 
-@router.post("/register", response_model=APIResponse[Member])
+@router.post("/register", response_model=APIResponse[MemberResponse])
 async def register_member(
     email: str,
     password: str,
@@ -45,7 +45,7 @@ async def register_member(
         status_code=201
     )
 
-@router.get("/me", response_model=APIResponse[Member])
+@router.get("/me", response_model=APIResponse[MemberResponse])
 async def get_current_member(
     current_user: User = Depends(require_member),
     db: AsyncSession = Depends(get_db)
@@ -65,7 +65,7 @@ async def get_current_member(
         status_code=200
     )
 
-@router.put("/me", response_model=APIResponse[Member])
+@router.put("/me", response_model=APIResponse[MemberResponse])
 async def update_current_member(
     full_name: str = None,
     phone: str = None,
