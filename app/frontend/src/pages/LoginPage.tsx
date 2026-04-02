@@ -11,19 +11,6 @@ interface LoginPageProps {
   onLogin: (user: User) => void;
   onGoRegister: () => void;
 }
-const DEMO_ACCOUNTS = [
-{
-  email: 'alice@gym.com',
-  role: 'Member'
-},
-{
-  email: 'mike@gym.com',
-  role: 'Trainer'
-},
-{
-  email: 'admin@fitclub.com',
-  role: 'Admin'
-}];
 
 export function LoginPage({ users, onLogin, onGoRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
@@ -232,47 +219,6 @@ export function LoginPage({ users, onLogin, onGoRegister }: LoginPageProps) {
                 Register here
               </button>
             </p>
-          </div>
-        </motion.div>
-
-        {/* Demo hint - fades in last */}
-        <motion.div
-          className="mt-4 text-center space-y-1"
-          initial={{
-            opacity: 0
-          }}
-          animate={{
-            opacity: 1
-          }}
-          transition={{
-            duration: 0.4,
-            delay: 0.5
-          }}>
-
-          <p className="text-xs text-slate-500 font-medium">
-            Demo accounts{' '}
-            <span className="text-slate-600">
-              (password: <span className="text-slate-400">password</span>)
-            </span>
-          </p>
-          <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-            {DEMO_ACCOUNTS.map(({ email: e, role }) =>
-            <motion.button
-              key={e}
-              type="button"
-              onClick={() => setEmail(e)}
-              className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
-              title={`Fill in ${role} email`}
-              whileHover={{
-                scale: 1.05
-              }}
-              whileTap={{
-                scale: 0.95
-              }}>
-
-                {e}
-              </motion.button>
-            )}
           </div>
         </motion.div>
       </div>
