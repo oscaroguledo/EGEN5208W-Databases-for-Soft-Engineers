@@ -13,13 +13,7 @@ root.render(
       <Toaster
         position="top-right"
         richColors
-        toastOptions={{
-          style: {
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            color: '#1e293b'
-          }
-        }}
+        closeButton
       />
     </ThemeProvider>
   </StrictMode>
