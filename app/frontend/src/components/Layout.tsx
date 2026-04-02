@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MenuIcon } from 'lucide-react';
-import { Sidebar } from './Sidebar';
-import { User } from '../data/types';
+import { Sidebar } from '@/components/Sidebar';
+import { User } from '@/data/types';
 type Page =
 'login' |
 'register' |
 'member-dashboard' |
 'member-profile' |
 'member-health' |
+'member-classes' |
 'trainer-availability' |
 'trainer-schedule' |
 'admin-rooms' |

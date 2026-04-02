@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarIcon, UsersIcon, UserIcon } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { StatusBadge } from '../../components/ui/Badge';
-import { ScheduleSkeleton } from '../../components/ui/Skeleton';
+import { Card } from '@/components/ui/Card';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { StatusBadge } from '@/components/ui/Badge';
+import { ScheduleSkeleton } from '@/components/ui/Skeleton';
 import {
   User,
   Trainer,
@@ -11,7 +11,7 @@ import {
   GroupClass,
   Member,
   Room } from
-'../../data/types';
+'@/data/types';
 interface SchedulePageProps {
   currentUser: User;
   trainers: Trainer[];

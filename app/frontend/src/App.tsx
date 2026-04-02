@@ -1,8 +1,8 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Layout } from './components/Layout';
-import { PageTransition } from './components/PageTransition';
-import { User, Member, Trainer, Room, FitnessGoal, HealthMetric, TrainerAvailability, GroupClass, ClassRegistration, PersonalSession, Equipment } from './data/types';
+import { Layout } from '@/components/Layout';
+import { PageTransition } from '@/components/PageTransition';
+import { User, Member, Trainer, Room, FitnessGoal, HealthMetric, TrainerAvailability, GroupClass, ClassRegistration, PersonalSession, Equipment } from '@/data/types';
 import { toast } from 'sonner';
 // ─── Maintenance mode flag ────────────────────────────────────────────────────
 // Set to true to show the maintenance page for all users
@@ -178,10 +178,10 @@ export function App() {
     (async () => {
       try {
         const [{ me }, membersApi, adminApi, trainersApi] = await Promise.all([
-          import('./apis/auth'),
-          import('./apis/members'),
-          import('./apis/admin'),
-          import('./apis/trainers')
+          import('@/apis/auth'),
+          import('@/apis/members'),
+          import('@/apis/admin'),
+          import('@/apis/trainers')
         ]);
 
         if (!mounted) return;
@@ -295,7 +295,7 @@ export function App() {
   const handleAddSession = (s: PersonalSession) =>
   setPersonalSessions((ss) => [...ss, s]);
   const handleBookSession = async (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; notes?: string }) => {
-    const membersApi = await import('./apis/members');
+    const membersApi = await import('@/apis/members');
     const res = await membersApi.bookSession(payload);
     const created = res && (res.session || res);
     if (created) {

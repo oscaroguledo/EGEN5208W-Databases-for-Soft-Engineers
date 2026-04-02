@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarIcon, UsersIcon, ClockIcon, MapPinIcon, SearchIcon } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { Input } from '../../components/ui/Input';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { DashboardSkeleton } from '../../components/ui/Skeleton';
-import { User, Member, GroupClass, Trainer, Room } from '../../data/types';
+import { toast } from 'sonner';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
+import { User, Member, GroupClass, Trainer, Room } from '@/data/types';
+import { listAvailableClasses, enrollInClass } from '@/apis/members';
 
 interface ClassesPageProps {
   currentUser: User;
@@ -33,157 +35,12 @@ export function ClassesPage({
   useEffect(() => {
     const fetchClasses = async () => {
       try {
-        // In a real app, this would fetch from the API
-        // For now, we'll use mock data with more classes to demonstrate pagination
-        const mockClasses: GroupClass[] = [
-          {
-            class_id: 1,
-            class_name: "Yoga Flow",
-            trainer_id: 1,
-            room_id: 1,
-            class_date: "2026-03-15",
-            start_time: "09:00",
-            end_time: "10:00",
-            max_capacity: 20,
-            current_enrollment: 15,
-            status: "scheduled"
-          },
-          {
-            class_id: 2,
-            class_name: "HIIT Training",
-            trainer_id: 2,
-            room_id: 2,
-            class_date: "2026-03-15",
-            start_time: "10:30",
-            end_time: "11:30",
-            max_capacity: 15,
-            current_enrollment: 12,
-            status: "scheduled"
-          },
-          {
-            class_id: 3,
-            class_name: "Spin Class",
-            trainer_id: 1,
-            room_id: 3,
-            class_date: "2026-03-16",
-            start_time: "18:00",
-            end_time: "19:00",
-            max_capacity: 25,
-            current_enrollment: 25,
-            status: "full"
-          },
-          {
-            class_id: 4,
-            class_name: "Pilates",
-            trainer_id: 3,
-            room_id: 1,
-            class_date: "2026-03-16",
-            start_time: "08:00",
-            end_time: "09:00",
-            max_capacity: 12,
-            current_enrollment: 8,
-            status: "scheduled"
-          },
-          {
-            class_id: 5,
-            class_name: "Boxing",
-            trainer_id: 2,
-            room_id: 2,
-            class_date: "2026-03-16",
-            start_time: "19:30",
-            end_time: "20:30",
-            max_capacity: 10,
-            current_enrollment: 7,
-            status: "scheduled"
-          },
-          {
-            class_id: 6,
-            class_name: "Zumba",
-            trainer_id: 3,
-            room_id: 3,
-            class_date: "2026-03-17",
-            start_time: "17:00",
-            end_time: "18:00",
-            max_capacity: 30,
-            current_enrollment: 22,
-            status: "scheduled"
-          },
-          {
-            class_id: 7,
-            class_name: "CrossFit",
-            trainer_id: 1,
-            room_id: 1,
-            class_date: "2026-03-17",
-            start_time: "06:00",
-            end_time: "07:00",
-            max_capacity: 15,
-            current_enrollment: 15,
-            status: "full"
-          },
-          {
-            class_id: 8,
-            class_name: "Meditation",
-            trainer_id: 3,
-            room_id: 2,
-            class_date: "2026-03-17",
-            start_time: "12:00",
-            end_time: "12:30",
-            max_capacity: 20,
-            current_enrollment: 5,
-            status: "scheduled"
-          },
-          {
-            class_id: 9,
-            class_name: "Strength Training",
-            trainer_id: 2,
-            room_id: 3,
-            class_date: "2026-03-18",
-            start_time: "16:00",
-            end_time: "17:00",
-            max_capacity: 12,
-            current_enrollment: 9,
-            status: "scheduled"
-          },
-          {
-            class_id: 10,
-            class_name: "Aqua Fitness",
-            trainer_id: 1,
-            room_id: 1,
-            class_date: "2026-03-18",
-            start_time: "11:00",
-            end_time: "12:00",
-            max_capacity: 18,
-            current_enrollment: 14,
-            status: "scheduled"
-          },
-          {
-            class_id: 11,
-            class_name: "Kickboxing",
-            trainer_id: 3,
-            room_id: 2,
-            class_date: "2026-03-18",
-            start_time: "18:30",
-            end_time: "19:30",
-            max_capacity: 20,
-            current_enrollment: 18,
-            status: "full"
-          },
-          {
-            class_id: 12,
-            class_name: "Barre",
-            trainer_id: 2,
-            room_id: 3,
-            class_date: "2026-03-19",
-            start_time: "09:30",
-            end_time: "10:30",
-            max_capacity: 15,
-            current_enrollment: 11,
-            status: "scheduled"
-          }
-        ];
-        setClasses(mockClasses);
+        setLoading(true);
+        const data = await listAvailableClasses(0, 100);
+        setClasses(data || []);
       } catch (error) {
         console.error('Failed to fetch classes:', error);
+        toast.error('Failed to load classes. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -195,24 +52,16 @@ export function ClassesPage({
   const handleEnroll = async (classId: number) => {
     setEnrolling(classId);
     try {
-      // Try calling the members API first
-      try {
-        const membersApi = await import('../../apis/members');
-        await membersApi.enrollInClass(String(classId));
-        setClasses(prev => prev.map(cls => cls.class_id === classId ? { ...cls, current_enrollment: cls.current_enrollment + 1 } : cls));
-        alert('Successfully enrolled in class!');
-        return;
-      } catch (err) {
-        // fallback to simulated
-      }
-
-      // Fallback simulated API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setClasses(prev => prev.map(cls => cls.class_id === classId ? { ...cls, current_enrollment: cls.current_enrollment + 1 } : cls));
-      alert('Successfully enrolled in class! (simulated)');
+      await enrollInClass(String(classId));
+      setClasses(prev => prev.map(cls => 
+        cls.class_id === classId 
+          ? { ...cls, current_enrollment: cls.current_enrollment + 1 } 
+          : cls
+      ));
+      toast.success('Successfully enrolled in class!');
     } catch (error) {
       console.error('Failed to enroll:', error);
-      alert('Failed to enroll in class. Please try again.');
+      toast.error('Failed to enroll in class. Please try again.');
     } finally {
       setEnrolling(null);
     }

@@ -44,6 +44,13 @@ export async function bookSession(payload: { trainer_id: string; room_id: string
   return handleAxiosResponse(res);
 }
 
+export async function listAvailableClasses(skip = 0, limit = 100, class_date?: string) {
+  const params: any = { skip, limit };
+  if (class_date) params.class_date = class_date;
+  const res = await api.get('/members/classes/available', { params });
+  return handleAxiosResponse(res);
+}
+
 export async function enrollInClass(class_id: string) {
   const res = await api.post(`/members/enroll-class/${class_id}`);
   return handleAxiosResponse(res);

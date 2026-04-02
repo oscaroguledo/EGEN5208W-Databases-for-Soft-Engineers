@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIcon, TargetIcon, CalendarIcon, UsersIcon } from 'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { Badge } from '../../components/ui/Badge';
-import { DashboardSkeleton } from '../../components/ui/Skeleton';
+import { toast } from 'sonner';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Badge } from '@/components/ui/Badge';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import {
   User,
   Member,
@@ -13,7 +14,8 @@ import {
   PersonalSession,
   Trainer,
   Room } from
-'../../data/types';
+'@/data/types';
+import { bookSession } from '@/apis/members';
 interface DashboardPageProps {
   currentUser: User;
   members: Member[];
@@ -144,8 +146,7 @@ export function DashboardPage({
     }
     // Fallback: try members API directly
     try {
-      const membersApi = await import('../../apis/members');
-      const res = await membersApi.bookSession(payload);
+      const res = await bookSession(payload);
       const created = res && (res.session || res);
       if (created && onAddSession) {
         onAddSession(created as PersonalSession);

@@ -3,19 +3,21 @@ import {
   UserPlusIcon,
   CheckCircleIcon,
   XCircleIcon,
-  InfoIcon } from
-'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Dropdown } from '../../components/ui/Dropdown';
+  InfoIcon } from 'lucide-react';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Dropdown } from '@/components/ui/Dropdown';
 import { toast } from 'sonner';
-import { User, Member, Gender } from '../../data/types';
+import { User, Member, Gender } from '@/data/types';
+import * as membersApi from '@/apis/members';
+
 interface RegistrationPageProps {
   users: User[];
   members: Member[];
   onRegister: (user: User, member: Member) => void;
 }
+
 interface FormState {
   email: string;
   password: string;
@@ -193,7 +195,6 @@ export function RegistrationPage({
     setLoading(true);
     (async () => {
       try {
-        const membersApi = await import('../../apis/members');
         const payload = {
           email: form.email.toLowerCase().trim(),
           password: form.password,
@@ -204,7 +205,6 @@ export function RegistrationPage({
         };
         const res = await membersApi.registerMember(payload);
         setLoading(false);
-        // expect res to include created user/member; attempt to find them
         const createdUser = res && (res.user || res);
         const createdMember = res && (res.member || res);
         if (createdUser && createdMember) {
@@ -216,38 +216,9 @@ export function RegistrationPage({
           return;
         }
       } catch (err) {
-        // fallback to local simulated creation
-      }
-
-      setTimeout(() => {
         setLoading(false);
-        const newUserId = Math.max(...users.map((u) => u.user_id)) + 1;
-        const newMemberId = Math.max(...members.map((m) => m.member_id)) + 1;
-        const newUser: User = {
-          user_id: newUserId,
-          username: form.email.toLowerCase().trim(),
-          password: form.password,
-          role: 'member',
-          created_at: new Date().toISOString()
-        };
-        const newMember: Member = {
-          member_id: newMemberId,
-          user_id: newUserId,
-          full_name: form.full_name,
-          email: form.email.toLowerCase().trim(),
-          date_of_birth: form.date_of_birth,
-          gender: form.gender as Gender,
-          phone: form.phone,
-          registered_at: new Date().toISOString()
-        };
-        onRegister(newUser, newMember);
-        toast.success(
-          `Welcome, ${form.full_name}! Your account has been created. You can now sign in.`
-        );
-        setForm(EMPTY_FORM);
-        setErrors({});
-        setTouched({});
-      }, 200);
+        toast.error('Registration failed. Please try again.');
+      }
     })();
   };
   const handleClear = () => {

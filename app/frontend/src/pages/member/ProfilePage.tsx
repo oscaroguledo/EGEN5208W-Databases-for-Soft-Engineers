@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { UserIcon, TargetIcon, HeartPulseIcon } from 'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { Button } from '../../components/ui/Button';
-import { Input, Textarea } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
-import { Dropdown } from '../../components/ui/Dropdown';
-import { ProfileSkeleton } from '../../components/ui/Skeleton';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Button } from '@/components/ui/Button';
+import { Input, Textarea } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { ProfileSkeleton } from '@/components/ui/Skeleton';
 import { toast } from 'sonner';
-import { User, Member, FitnessGoal, HealthMetric } from '../../data/types';
+import { User, Member, FitnessGoal, HealthMetric } from '@/data/types';
 interface ProfilePageProps {
   currentUser: User;
   members: Member[];

@@ -2,8 +2,8 @@ import React from 'react';
 import './index.css';
 import { render } from 'react-dom';
 import { Toaster } from 'sonner';
-import { App } from './App';
-import { ThemeProvider } from './components/ThemeProvider';
+import { App } from '@/App';
+import { ThemeProvider } from '@/components/ThemeProvider';
 render(
   <ThemeProvider>
     <App />

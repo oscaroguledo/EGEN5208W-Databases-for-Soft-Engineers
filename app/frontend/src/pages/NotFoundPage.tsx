@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { DumbbellIcon, HomeIcon, ArrowLeftIcon } from 'lucide-react';
-import { Button } from '../components/ui/Button';
+import { Button } from '@/components/ui/Button';
 interface NotFoundPageProps {
   onGoHome: () => void;
   onGoBack?: () => void;

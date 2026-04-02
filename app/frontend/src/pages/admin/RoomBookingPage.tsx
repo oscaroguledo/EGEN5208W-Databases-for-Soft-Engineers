@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { DoorOpenIcon } from 'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Dropdown } from '../../components/ui/Dropdown';
-import { Badge } from '../../components/ui/Badge';
-import { RoomBookingSkeleton } from '../../components/ui/Skeleton';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { Badge } from '@/components/ui/Badge';
+import { RoomBookingSkeleton } from '@/components/ui/Skeleton';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 import { toast } from 'sonner';
 import {
   Room,
@@ -15,7 +15,7 @@ import {
   Trainer,
   Member,
   timesOverlap } from
-'../../data/types';
+'@/data/types';
 interface RoomBookingPageProps {
   rooms: Room[];
   personalSessions: PersonalSession[];

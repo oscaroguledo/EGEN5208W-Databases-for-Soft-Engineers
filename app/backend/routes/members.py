@@ -157,6 +157,35 @@ async def get_health_history(
         status_code=200
     )
 
+@router.get("/classes/available", response_model=APIResponse[List])
+async def list_available_classes(
+    skip: int = 0,
+    limit: int = 100,
+    class_date: str = None,
+    current_user: User = Depends(require_member),
+    db: AsyncSession = Depends(get_db)
+):
+    """List available group classes for enrollment"""
+    from datetime import datetime
+    
+    date_obj = None
+    if class_date:
+        date_obj = datetime.strptime(class_date, "%Y-%m-%d").date()
+    
+    classes = await MemberService.list_available_classes(
+        db=db,
+        skip=skip,
+        limit=limit,
+        class_date=date_obj
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Available classes retrieved",
+        data=classes,
+        status_code=200
+    )
+
 @router.get("/list", response_model=APIResponse[List])
 async def list_members(
     skip: int = 0,

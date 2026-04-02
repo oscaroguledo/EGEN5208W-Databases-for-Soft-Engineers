@@ -7,18 +7,18 @@ import {
   CheckIcon,
   XIcon } from
 'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { AvailabilitySkeleton } from '../../components/ui/Skeleton';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { AvailabilitySkeleton } from '@/components/ui/Skeleton';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 import { toast } from 'sonner';
 import {
   User,
   Trainer,
   TrainerAvailability,
   timesOverlap } from
-'../../data/types';
+'@/data/types';
 interface AvailabilityPageProps {
   currentUser: User;
   trainers: Trainer[];

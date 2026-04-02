@@ -250,6 +250,32 @@ class MemberService:
         return result.rowcount > 0
 
     @staticmethod
+    async def list_available_classes(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
+        class_date: Optional[date] = None
+    ) -> List[Class]:
+        """
+        List available group classes for members to enroll in
+        """
+        from models.trainings import Class, ClassStatus
+        
+        query = (
+            select(Class)
+            .where(Class.status.in_([ClassStatus.scheduled, ClassStatus.full]))
+            .where(Class.deleted_at.is_(None))
+            .order_by(Class.class_date, Class.start_time)
+        )
+        
+        if class_date:
+            query = query.where(Class.class_date == class_date)
+        
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        return result.scalars().all()
+
+    @staticmethod
     async def book_training_session(
         db: AsyncSession,
         member_id: UUID,

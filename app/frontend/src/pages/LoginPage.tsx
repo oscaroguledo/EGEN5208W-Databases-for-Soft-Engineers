@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { DumbbellIcon } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { User } from '../data/types';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { User } from '@/data/types';
+import { login } from '@/apis/auth';
 interface LoginPageProps {
   users: User[];
   onLogin: (user: User) => void;
@@ -28,41 +29,39 @@ export function LoginPage({ users, onLogin, onGoRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    (async () => {
-      try {
-        const auth = await import('../apis/auth');
-        const resp = await auth.login(email.trim(), password);
-        // resp may be { access_token, token_type, user } or user directly
-        const user = resp && (resp.user || resp);
-        setLoading(false);
-        if (user) {
-          toast.success('Welcome back!');
-          onLogin(user as User);
-          return;
-        }
-      } catch (err) {
-        // fallback to local fixtures
+    
+    try {
+      const resp = await login(email.trim(), password);
+      // resp may be { access_token, token_type, user } or user directly
+      const user = resp && (resp.user || resp);
+      
+      if (user) {
+        toast.success('Welcome back!');
+        onLogin(user as User);
+        return;
       }
+    } catch (err) {
+      console.error('Login error:', err);
+    }
 
-      // fallback simulated auth (existing behavior)
-      setTimeout(() => {
-        const user = users.find(
-          (x) =>
-          x.username.toLowerCase() === email.toLowerCase().trim() &&
-          x.password === password
-        );
-        setLoading(false);
-        if (user) {
-          toast.success(`Welcome back!`);
-          onLogin(user);
-        } else {
-          toast.error('Invalid email or password. Please try again.');
-        }
-      }, 200);
-    })();
+    // Fallback to local fixtures
+    setTimeout(() => {
+      const user = users.find(
+        (x) =>
+        x.username.toLowerCase() === email.toLowerCase().trim() &&
+        x.password === password
+      );
+      setLoading(false);
+      if (user) {
+        toast.success(`Welcome back!`);
+        onLogin(user);
+      } else {
+        toast.error('Invalid email or password. Please try again.');
+      }
+    }, 200);
   };
   return (
     <div

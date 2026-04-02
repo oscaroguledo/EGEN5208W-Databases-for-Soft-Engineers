@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { WrenchIcon, PlusIcon, FilterIcon, Trash2Icon, PencilIcon } from 'lucide-react';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input, Textarea } from '../../components/ui/Input';
-import { Dropdown } from '../../components/ui/Dropdown';
-import { Modal } from '../../components/ui/Modal';
-import { StatusBadge } from '../../components/ui/Badge';
-import { EquipmentSkeleton } from '../../components/ui/Skeleton';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input, Textarea } from '@/components/ui/Input';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { Modal } from '@/components/ui/Modal';
+import { StatusBadge } from '@/components/ui/Badge';
+import { EquipmentSkeleton } from '@/components/ui/Skeleton';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 import { toast } from 'sonner';
-import { Equipment, Room, EquipmentStatus } from '../../data/types';
+import { Equipment, Room, EquipmentStatus } from '@/data/types';
 interface EquipmentPageProps {
   equipment: Equipment[];
   rooms: Room[];

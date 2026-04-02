@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIcon, FilterIcon, SearchIcon } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
-import { Dropdown } from '../../components/ui/Dropdown';
-import { Input } from '../../components/ui/Input';
-import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { HealthHistorySkeleton } from '../../components/ui/Skeleton';
-import { User, Member, HealthMetric } from '../../data/types';
+import { Card } from '@/components/ui/Card';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { Input } from '@/components/ui/Input';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { HealthHistorySkeleton } from '@/components/ui/Skeleton';
+import { User, Member, HealthMetric } from '@/data/types';
 
 interface HealthHistoryPageProps {
   currentUser: User;

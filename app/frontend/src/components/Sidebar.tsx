@@ -14,9 +14,9 @@ import {
   MoonIcon,
   XIcon } from
 'lucide-react';
-import { RoleBadge } from './ui/Badge';
-import { User } from '../data/types';
-import { useTheme } from './ThemeProvider';
+import { RoleBadge } from '@/components/ui/Badge';
+import { User } from '@/data/types';
+import { useTheme } from '@/components/ThemeProvider';
 type Page =
 'login' |
 'register' |
