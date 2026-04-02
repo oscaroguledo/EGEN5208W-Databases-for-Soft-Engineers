@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
@@ -101,28 +101,6 @@ export function Pagination({
           <ChevronRightIcon className="w-4 h-4" />
         </button>
       </div>
-    </div>);
-
-}
-// Hook for easy pagination state management
-export function usePagination<T>(items: T[], pageSize: number = 8) {
-  const [currentPage, setCurrentPage] = useState(1);
-  // Remove the useEffect that was causing hook order issues
-  // const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  // const safePage = Math.min(currentPage, totalPages);
-  // const paginated = items.slice((safePage - 1) * pageSize, safePage * pageSize);
-  
-  // Calculate pagination values directly without useEffect
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginated = items.slice((safePage - 1) * pageSize, safePage * pageSize);
-  
-  return {
-    currentPage: safePage,
-    totalPages,
-    totalItems: items.length,
-    pageSize,
-    paginated,
-    setCurrentPage
-  };
+    </div>
+  );
 }

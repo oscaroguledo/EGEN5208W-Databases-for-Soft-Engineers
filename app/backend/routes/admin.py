@@ -5,7 +5,7 @@ from uuid import UUID
 
 from core.db import get_db
 from core.auth import require_admin
-from core.response import APIResponse
+from core.response import APIResponse, Pagination
 
 from services.users.admin_staff import AdminStaffService
 from models.users.user import User
@@ -109,17 +109,25 @@ async def get_all_equipment(
     db: AsyncSession = Depends(get_db)
 ):
     """View all equipment with pagination (admin only)"""
-    equipment = await AdminStaffService.list_equipments(
+    equipment_list, total = await AdminStaffService.list_equipments(
         db=db,
         skip=skip,
         limit=limit,
         status=status_filter
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Equipment list retrieved with pagination",
-        data=equipment,
+        data=equipment_list,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )
     from models.equipments import Equipment, EquipmentStatus
@@ -156,17 +164,25 @@ async def list_equipment_paginated(
     db: AsyncSession = Depends(get_db)
 ):
     """List all equipment with pagination (admin only)"""
-    equipment = await AdminStaffService.list_equipments(
+    equipment_list, total = await AdminStaffService.list_equipments(
         db=db,
         skip=skip,
         limit=limit,
         status=status_filter
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Equipment list retrieved with pagination",
-        data=equipment,
+        data=equipment_list,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )
 
@@ -219,7 +235,7 @@ async def list_training_sessions(
     db: AsyncSession = Depends(get_db)
 ):
     """List training sessions with pagination (admin only)"""
-    sessions = await AdminStaffService.list_sessions(
+    sessions, total = await AdminStaffService.list_sessions(
         db=db,
         skip=skip,
         limit=limit,
@@ -228,10 +244,18 @@ async def list_training_sessions(
         status=status_filter
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Training sessions list retrieved with pagination",
         data=sessions,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )
 
@@ -246,7 +270,7 @@ async def list_payments(
     db: AsyncSession = Depends(get_db)
 ):
     """List payments with pagination (admin only)"""
-    payments = await AdminStaffService.list_payments(
+    payments, total = await AdminStaffService.list_payments(
         db=db,
         skip=skip,
         limit=limit,
@@ -255,9 +279,17 @@ async def list_payments(
         status=status_filter
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Payments list retrieved with pagination",
         data=payments,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )

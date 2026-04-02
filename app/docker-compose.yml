@@ -77,22 +77,6 @@ services:
       - dev
       - prod
 
-  # Production Frontend (Nginx)
-  frontend-prod:
-    build:
-      context: ./app/frontend
-      dockerfile: Dockerfile
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
-    environment:
-      - NODE_ENV=production
-    depends_on:
-      - backend
-    networks:
-      - gym-network
-    profiles:
-      - prod
-
 volumes:
   postgres_data:
 

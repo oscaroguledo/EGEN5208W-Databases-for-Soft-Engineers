@@ -1,5 +1,4 @@
-
-
+# Member model - stores gym member profile information
 from core.db import Base
 from sqlalchemy import Column, UUID, ForeignKey, String, DateTime
 from sqlalchemy.orm import relationship
@@ -8,11 +7,15 @@ from datetime import datetime
 import enum
 from sqlalchemy import Date
 
+
 class Gender(enum.Enum):
+    """Member gender options"""
     male = "male"
     female = "female"
 
+
 class Member(Base):
+    """Gym member profile model"""
     __tablename__ = "members"
 
     id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
@@ -23,6 +26,7 @@ class Member(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
     user = relationship("User", back_populates="member")
     subscriptions = relationship("MemberSubscription", back_populates="member")
     fitness_goals = relationship("FitnessGoal", back_populates="member")
@@ -35,6 +39,7 @@ class Member(Base):
         return f"<Member(id='{self.id}', full_name='{self.full_name}', phone='{self.phone}')>"
 
     def to_dict(self):
+        """Convert member to dictionary for API responses"""
         return {
             "id": str(self.id),
             "full_name": self.full_name,

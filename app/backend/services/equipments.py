@@ -1,7 +1,7 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete
+from sqlalchemy import update, delete, func
 from uuid import UUID
 from datetime import datetime
 
@@ -29,18 +29,32 @@ class EquipmentService:
         limit: int = 100,
         status: Optional[EquipmentStatus] = None,
         room_id: Optional[UUID] = None
-    ) -> List[Equipment]:
+    ) -> Tuple[List[Equipment], int]:
         """
-        List equipments with optional filtering by status and room
+        List equipments with optional filtering by status and room.
+        Returns tuple of (equipment_list, total_count) for pagination.
         """
-        query = select(Equipment).where(Equipment.deleted_at.is_(None))
+        # Build base query for counting total
+        count_query = select(func.count(Equipment.id)).where(Equipment.deleted_at.is_(None))
         if status:
-            query = query.where(Equipment.status == status)
+            count_query = count_query.where(Equipment.status == status)
         if room_id:
-            query = query.where(Equipment.room_id == room_id)
-        query = query.offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+            count_query = count_query.where(Equipment.room_id == room_id)
+        
+        # Execute count query
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # Build data query with pagination
+        data_query = select(Equipment).where(Equipment.deleted_at.is_(None))
+        if status:
+            data_query = data_query.where(Equipment.status == status)
+        if room_id:
+            data_query = data_query.where(Equipment.room_id == room_id)
+        data_query = data_query.offset(skip).limit(limit)
+        
+        result = await db.execute(data_query)
+        return result.scalars().all(), total
 
     @staticmethod
     async def create_equipment(

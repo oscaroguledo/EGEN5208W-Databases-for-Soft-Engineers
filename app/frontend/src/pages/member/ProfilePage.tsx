@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserIcon, TargetIcon, HeartPulseIcon } from 'lucide-react';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Card } from '@/components/ui/Card';
+import { CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input, Textarea } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
-import { ProfileSkeleton } from '@/components/ui/Skeleton';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/Badge';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Textarea } from '@/components/ui/Textarea';
 import { User, Member, FitnessGoal, HealthMetric } from '@/data/types';
+import { toast } from 'sonner';
+import * as membersApi from '@/apis/members';
+import { ProfileSkeleton } from '@/components/ui/Skeleton';
+
 interface ProfilePageProps {
   currentUser: User;
   members: Member[];
@@ -131,28 +135,18 @@ export function ProfilePage({
     setSavingProfile(true);
     (async () => {
       try {
-        const membersApi = await import('../../apis/members');
         const res = await membersApi.updateMemberMe({ full_name: profileForm.full_name, phone: profileForm.phone });
-        // res may return the updated member
         const updated = res && (res.member || res);
         if (updated) {
           onUpdateMember(updated as Member);
-          setSavingProfile(false);
           toast.success('Profile updated successfully.');
-          return;
+        } else {
+          toast.error('Failed to update profile.');
         }
       } catch (err) {
-        // fallback to local update
+        toast.error('Failed to update profile.');
       }
-      setTimeout(() => {
-        onUpdateMember({
-          ...member,
-          full_name: profileForm.full_name,
-          phone: profileForm.phone
-        });
-        setSavingProfile(false);
-        toast.success('Profile updated successfully.');
-      }, 200);
+      setSavingProfile(false);
     })();
   };
   const handleAddGoal = (e: React.FormEvent) => {
@@ -164,7 +158,6 @@ export function ProfilePage({
     setSavingGoal(true);
     (async () => {
       try {
-        const membersApi = await import('../../apis/members');
         const newGoal = {
           member_id: member.member_id,
           goal_type: goalForm.goal_type,
@@ -174,39 +167,18 @@ export function ProfilePage({
           is_active: true
         };
         const res = await membersApi.updateGoals([newGoal]);
-        // res may return the created goal(s)
         const created = res && (Array.isArray(res) ? res[0] : (res.goal || res));
         if (created) {
           onAddGoal(created as FitnessGoal);
           setGoalForm({ goal_type: '', target_value: '', target_unit: '', description: '' });
-          setSavingGoal(false);
           toast.success(`Fitness goal "${newGoal.goal_type}" added successfully.`);
-          return;
+        } else {
+          toast.error('Failed to add goal.');
         }
       } catch (err) {
-        // fallback
+        toast.error('Failed to add goal.');
       }
-      setTimeout(() => {
-        const newId = Math.max(...fitnessGoals.map((g) => g.goal_id), 0) + 1;
-        onAddGoal({
-          goal_id: newId,
-          member_id: member.member_id,
-          goal_type: goalForm.goal_type,
-          target_value: parseFloat(goalForm.target_value) || 0,
-          target_unit: goalForm.target_unit,
-          description: goalForm.description,
-          is_active: true,
-          created_at: new Date().toISOString()
-        });
-        setGoalForm({
-          goal_type: '',
-          target_value: '',
-          target_unit: '',
-          description: ''
-        });
-        setSavingGoal(false);
-        toast.success(`Fitness goal "${goalForm.goal_type}" added successfully.`);
-      }, 200);
+      setSavingGoal(false);
     })();
   };
   const handleAddMetric = (e: React.FormEvent) => {
@@ -218,40 +190,19 @@ export function ProfilePage({
     setSavingMetric(true);
     (async () => {
       try {
-        const membersApi = await import('../../apis/members');
         const res = await membersApi.addHealthMetric(metricForm.metric_type, parseFloat(metricForm.value));
-        // backend may return the created metric
         const created = res && (res.metric || res);
         if (created) {
           onAddMetric(created as HealthMetric);
           setMetricForm({ metric_type: '', value: '', unit: '' });
-          setSavingMetric(false);
           toast.success(`Health metric "${metricForm.metric_type}" recorded successfully.`);
-          return;
+        } else {
+          toast.error('Failed to record metric.');
         }
       } catch (err) {
-        // fallback
+        toast.error('Failed to record metric.');
       }
-      setTimeout(() => {
-        const newId = Math.max(...healthMetrics.map((m) => m.metric_id), 0) + 1;
-        onAddMetric({
-          metric_id: newId,
-          member_id: member.member_id,
-          metric_type: metricForm.metric_type,
-          value: parseFloat(metricForm.value),
-          unit: metricForm.unit,
-          recorded_at: new Date().toISOString()
-        });
-        setMetricForm({
-          metric_type: '',
-          value: '',
-          unit: ''
-        });
-        setSavingMetric(false);
-        toast.success(
-          `Health metric "${metricForm.metric_type}" recorded successfully.`
-        );
-      }, 200);
+      setSavingMetric(false);
     })();
   };
   const tabs: {

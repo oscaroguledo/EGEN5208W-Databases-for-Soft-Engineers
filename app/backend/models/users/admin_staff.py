@@ -1,12 +1,13 @@
-
-
+# Admin staff model - stores admin profile information
 from core.db import Base
 from sqlalchemy import Column, UUID, ForeignKey, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import DateTime
 from datetime import datetime
 
+
 class AdminStaff(Base):
+    """Admin staff profile model"""
     __tablename__ = "admin_staff"
 
     id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
@@ -14,12 +15,14 @@ class AdminStaff(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
     user = relationship("User", back_populates="admin_staff")
     
     def __repr__(self):
         return f"<AdminStaff(id='{self.id}', full_name='{self.full_name}')>"
     
     def to_dict(self):
+        """Convert admin staff to dictionary for API responses"""
         return {
             "id": str(self.id),
             "full_name": self.full_name,

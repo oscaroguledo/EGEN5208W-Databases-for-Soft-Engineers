@@ -1,5 +1,4 @@
-
-
+# User model - stores authentication and role information
 from sqlalchemy import Column, String, Enum, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -7,12 +6,14 @@ from core.db import Base
 import uuid
 from datetime import datetime
 
+# Available user roles in the system
 class UserRole(str, Enum):
     admin = "admin"
     trainer = "trainer"
     member = "member"
 
 class User(Base):
+    """User model with authentication details"""
     __tablename__ = "users"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -22,13 +23,16 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
+    # Relationships to role-specific tables
     member = relationship("Member", back_populates="user", uselist=False)
     trainer = relationship("Trainer", back_populates="user", uselist=False)
     admin_staff = relationship("AdminStaff", back_populates="user", uselist=False)
+
     def __repr__(self):
         return f"<User(email='{self.email}', role='{self.role}')>"
     
     def to_dict(self):
+        """Convert user to dictionary for API responses"""
         return {
             "id": str(self.id),
             "email": self.email,

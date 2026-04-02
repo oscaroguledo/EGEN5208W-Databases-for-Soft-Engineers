@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, and_, func
@@ -184,13 +184,19 @@ class TrainerService:
         db: AsyncSession,
         skip: int = 0,
         limit: int = 100
-    ) -> List[Trainer]:
+    ) -> Tuple[List[Trainer], int]:
         """
-        List all trainers with pagination
+        List all trainers with pagination.
+        Returns tuple of (trainers_list, total_count).
         """
-        query = select(Trainer).where(Trainer.deleted_at.is_(None)).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        count_query = select(func.count(Trainer.id)).where(Trainer.deleted_at.is_(None))
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        data_query = select(Trainer).where(Trainer.deleted_at.is_(None)).offset(skip).limit(limit)
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
 
     @staticmethod
     async def create_trainer(

@@ -1,45 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { WrenchIcon, PlusIcon, FilterIcon, Trash2Icon, PencilIcon } from 'lucide-react';
-import { Card, CardHeader } from '@/components/ui/Card';
+import React, { useState, useCallback } from 'react';
+import { WrenchIcon, PlusIcon, PencilIcon, Trash2Icon, FilterIcon } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input, Textarea } from '@/components/ui/Input';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 import { StatusBadge } from '@/components/ui/Badge';
 import { EquipmentSkeleton } from '@/components/ui/Skeleton';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
 import { toast } from 'sonner';
-import { Equipment, Room, EquipmentStatus } from '@/data/types';
-interface EquipmentPageProps {
-  equipment: Equipment[];
-  rooms: Room[];
-  onAddEquipment: (e: Equipment) => void;
-  onUpdateEquipment: (e: Equipment) => void;
-  onDeleteEquipment: (id: number) => void;
-}
-const STATUS_OPTIONS = [
-{
-  value: 'operational',
-  label: 'Operational'
-},
-{
-  value: 'under repair',
-  label: 'Under Repair'
-},
-{
-  value: 'out of service',
-  label: 'Out of Service'
-}];
+import { Equipment, EquipmentStatus, Room } from '@/data/types';
+import * as adminApi from '@/apis/admin';
+import { usePagination } from '@/hooks/useServerPagination';
 
-export function EquipmentPage({
-  equipment,
-  rooms,
-  onAddEquipment,
-  onUpdateEquipment,
-  onDeleteEquipment
-}: EquipmentPageProps) {
-  const [loading, setLoading] = useState(true);
-  const [savingEquipment, setSavingEquipment] = useState(false);
+interface EquipmentPageProps {
+  rooms: Room[];
+}
+
+const STATUS_OPTIONS = [
+  { value: 'operational', label: 'Operational' },
+  { value: 'under repair', label: 'Under Repair' },
+  { value: 'out of service', label: 'Out of Service' }
+];
+
+const PAGE_SIZE = 8;
+
+export function EquipmentPage({ rooms }: EquipmentPageProps) {
   const [filter, setFilter] = useState<'all' | 'needs-attention'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [newForm, setNewForm] = useState({
@@ -55,49 +42,48 @@ export function EquipmentPage({
     status: 'operational' as EquipmentStatus,
     notes: ''
   });
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(t);
+
+  // Server-side pagination
+  const fetchEquipment = useCallback(async (skip: number, limit: number) => {
+    const res = await adminApi.listEquipmentPaginated(skip, limit);
+    return res;
   }, []);
-  const displayed =
-  filter === 'needs-attention' ?
-  equipment.filter((e) => e.status !== 'operational') :
-  equipment;
-  const needsAttentionCount = equipment.filter(
-    (e) => e.status !== 'operational'
-  ).length;
+
+  const {
+    data: equipment,
+    isLoading,
+    currentPage,
+    totalPages,
+    totalItems,
+    setPage,
+    refresh
+  } = usePagination<Equipment>(fetchEquipment, { pageSize: PAGE_SIZE });
+
+  // Calculate counts for status summary
+  const underRepairCount = equipment.filter((e) => e.status === 'under repair').length;
+  const outOfServiceCount = equipment.filter((e) => e.status === 'out of service').length;
+  const needsAttentionCount = underRepairCount + outOfServiceCount;
+
+  // Filter displayed equipment for 'needs-attention' filter
+  const displayed = filter === 'needs-attention' 
+    ? equipment.filter((e) => e.status !== 'operational')
+    : equipment;
+
   const roomOptions = rooms.map((r) => ({
     value: String(r.room_id),
     label: r.room_name
   }));
-  const pagination = usePagination(displayed, 8);
-  if (loading) return <EquipmentSkeleton />;
-  const handleStatusChange = (eq: Equipment, newStatus: EquipmentStatus) => {
-    (async () => {
-      try {
-        const admin = await import('../../apis/admin');
-        await admin.updateEquipmentStatus(String(eq.equipment_id), newStatus, undefined);
-        const updated: Equipment = {
-          ...eq,
-          status: newStatus,
-          last_maintained: newStatus === 'operational' ? new Date().toISOString().split('T')[0] : eq.last_maintained
-        };
-        onUpdateEquipment(updated);
-        toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
-        return;
-      } catch (err) {
-        // fallback to local update
-      }
 
-      const updated: Equipment = {
-        ...eq,
-        status: newStatus,
-        last_maintained: newStatus === 'operational' ? new Date().toISOString().split('T')[0] : eq.last_maintained
-      };
-      onUpdateEquipment(updated);
+  const handleStatusChange = async (eq: Equipment, newStatus: EquipmentStatus) => {
+    try {
+      await adminApi.updateEquipmentStatus(String(eq.equipment_id), newStatus, undefined);
       toast.success(`"${eq.equipment_name}" status updated to "${newStatus}".`);
-    })();
+      refresh();
+    } catch (err) {
+      toast.error('Failed to update equipment status.');
+    }
   };
+
   const openEdit = (eq: Equipment) => {
     setEditing(eq);
     setEditingForm({
@@ -108,120 +94,62 @@ export function EquipmentPage({
     });
     setModalOpen(true);
   };
-  const handleUpdateSubmit = (ev: React.FormEvent) => {
+
+  const handleUpdateSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!editing) return;
     if (!editingForm.equipment_name.trim() || !editingForm.room_id) {
       toast.error('Equipment name and room are required.');
       return;
     }
-    setSavingEquipment(true);
-    (async () => {
-      try {
-        // If there's an API for updating equipment, call it. Fallback to local update otherwise.
-        const admin = await import('../../apis/admin');
-        // admin does not expose updateEquipment by default; attempt status update at least
-        await admin.updateEquipmentStatus(String(editing.equipment_id), editingForm.status, editingForm.notes);
-        const updated: Equipment = {
-          ...editing,
-          equipment_name: editingForm.equipment_name,
-          room_id: parseInt(editingForm.room_id),
-          status: editingForm.status,
-          notes: editingForm.notes
-        };
-        onUpdateEquipment(updated);
-        setSavingEquipment(false);
-        setModalOpen(false);
-        toast.success(`Equipment "${updated.equipment_name}" updated.`);
-        setEditing(null);
-        return;
-      } catch (err) {
-        // fallback to local update
-      }
-
-      const updated: Equipment = {
-        ...editing,
-        equipment_name: editingForm.equipment_name,
-        room_id: parseInt(editingForm.room_id),
-        status: editingForm.status,
-        notes: editingForm.notes
-      };
-      onUpdateEquipment(updated);
-      setSavingEquipment(false);
+    try {
+      await adminApi.updateEquipmentStatus(String(editing.equipment_id), editingForm.status, editingForm.notes);
+      toast.success(`Equipment "${editingForm.equipment_name}" updated.`);
       setModalOpen(false);
-      toast.success(`Equipment "${updated.equipment_name}" updated.`);
       setEditing(null);
-    })();
+      refresh();
+    } catch (err) {
+      toast.error('Failed to update equipment.');
+    }
   };
-  const handleAddEquipment = (e: React.FormEvent) => {
+
+  const handleAddEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newForm.equipment_name.trim() || !newForm.room_id) {
       toast.error('Equipment name and room are required.');
       return;
     }
-    setSavingEquipment(true);
-    (async () => {
-      try {
-        const admin = await import('../../apis/admin');
-        // admin does not expose createEquipment endpoint in wrappers; fall back if not present
-        if (typeof (admin as any).createEquipment === 'function') {
-          const res = await (admin as any).createEquipment({
-            equipment_name: newForm.equipment_name,
-            room_id: parseInt(newForm.room_id),
-            status: newForm.status,
-            notes: newForm.notes
-          });
-          // try to use returned equipment
-          if (res && res.equipment_id) {
-            onAddEquipment(res as Equipment);
-            setNewForm({ equipment_name: '', room_id: '', status: 'operational', notes: '' });
-            setModalOpen(false);
-            setSavingEquipment(false);
-            toast.success(`Equipment "${res.equipment_name}" logged successfully.`);
-            return;
-          }
-        }
-      } catch (err) {
-        // continue to fallback
-      }
-
-      const newId = Math.max(...equipment.map((e) => e.equipment_id), 0) + 1;
-      onAddEquipment({
-        equipment_id: newId,
+    try {
+      const res = await (adminApi as any).createEquipment({
         equipment_name: newForm.equipment_name,
         room_id: parseInt(newForm.room_id),
         status: newForm.status,
-        last_maintained: new Date().toISOString().split('T')[0],
         notes: newForm.notes
       });
-      setNewForm({
-        equipment_name: '',
-        room_id: '',
-        status: 'operational',
-        notes: ''
-      });
-      setModalOpen(false);
-      setSavingEquipment(false);
-      toast.success(`Equipment "${newForm.equipment_name}" logged successfully.`);
-    })();
-  };
-  const handleDeleteEquipment = (eq: Equipment) => {
-    (async () => {
-      try {
-        const admin = await import('../../apis/admin');
-        if (typeof (admin as any).deleteEquipment === 'function') {
-          await (admin as any).deleteEquipment(String(eq.equipment_id));
-          onDeleteEquipment(eq.equipment_id);
-          toast.success(`"${eq.equipment_name}" has been removed.`);
-          return;
-        }
-      } catch (err) {
-        // fallback
+      if (res && res.equipment_id) {
+        toast.success(`Equipment "${res.equipment_name}" created successfully.`);
+        setNewForm({ equipment_name: '', room_id: '', status: 'operational', notes: '' });
+        setModalOpen(false);
+        refresh();
+      } else {
+        toast.error('Failed to create equipment.');
       }
-      onDeleteEquipment(eq.equipment_id);
-      toast.success(`"${eq.equipment_name}" has been removed.`);
-    })();
+    } catch (err) {
+      toast.error('Failed to create equipment.');
+    }
   };
+
+  const handleDeleteEquipment = async (eq: Equipment) => {
+    try {
+      await (adminApi as any).deleteEquipment(String(eq.equipment_id));
+      toast.success(`"${eq.equipment_name}" has been removed.`);
+      refresh();
+    } catch (err) {
+      toast.error('Failed to delete equipment.');
+    }
+  };
+
+  if (isLoading && equipment.length === 0) return <EquipmentSkeleton />;
   return (
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -301,7 +229,7 @@ export function EquipmentPage({
               onClick={() => setFilter('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === 'all' ? 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
 
-              All ({equipment.length})
+              All ({totalItems})
             </button>
             <button
               onClick={() => setFilter('needs-attention')}
@@ -315,7 +243,7 @@ export function EquipmentPage({
         <div className="max-h-[60vh] overflow-y-auto">
           {/* Mobile: stacked list */}
           <div className="space-y-3 md:hidden px-4 sm:px-6">
-            {pagination.paginated.map((eq) => {
+            {displayed.map((eq: Equipment) => {
               const room = rooms.find((r) => r.room_id === eq.room_id);
               return (
                 <div key={eq.equipment_id} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3`}> 
@@ -380,7 +308,7 @@ export function EquipmentPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-              {pagination.paginated.map((eq) => {
+              {displayed.map((eq: Equipment) => {
                 const room = rooms.find((r) => r.room_id === eq.room_id);
                 const rowBg =
                 eq.status === 'operational' ?
@@ -457,11 +385,11 @@ export function EquipmentPage({
         </div>
         <div className="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700">
           <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            onPageChange={pagination.setCurrentPage}
-            totalItems={pagination.totalItems}
-            pageSize={pagination.pageSize}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
           />
         </div>
       </Card>
@@ -483,10 +411,8 @@ export function EquipmentPage({
             </Button>
             <Button
             variant="primary"
-            loading={savingEquipment}
             onClick={(editing ? (handleUpdateSubmit as any) : (handleAddEquipment as any))}>
-
-              {savingEquipment ? 'Saving…' : editing ? 'Save Changes' : 'Save Equipment'}
+              {editing ? 'Save Changes' : 'Save Equipment'}
             </Button>
           </>
         }>

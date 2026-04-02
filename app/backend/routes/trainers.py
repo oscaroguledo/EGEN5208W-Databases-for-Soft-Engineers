@@ -4,8 +4,8 @@ from typing import List
 from uuid import UUID
 
 from core.db import get_db
-from core.auth import require_trainer
-from core.response import APIResponse
+from core.auth import require_trainer, require_admin
+from core.response import APIResponse, Pagination
 
 from services.users.trainers import TrainerService
 from models.users.user import User
@@ -90,15 +90,23 @@ async def list_trainers(
     db: AsyncSession = Depends(get_db)
 ):
     """List all trainers with pagination (admin only)"""
-    trainers = await TrainerService.list_trainers(
+    trainers, total = await TrainerService.list_trainers(
         db=db,
         skip=skip,
         limit=limit
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Trainers list retrieved with pagination",
         data=trainers,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )

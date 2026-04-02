@@ -1,3 +1,4 @@
+# Member API routes - registration, profile, classes, sessions
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -5,7 +6,7 @@ from uuid import UUID
 
 from core.db import get_db
 from core.auth import require_member, PermissionChecker
-from core.response import APIResponse
+from core.response import APIResponse, Pagination
 from models.users.user import User, UserRole
 from models.users.members import Member
 
@@ -195,17 +196,25 @@ async def list_members(
     db: AsyncSession = Depends(get_db)
 ):
     """List all members with pagination (admin only)"""
-    members = await MemberService.list_members(
+    members, total = await MemberService.list_members(
         db=db,
         skip=skip,
         limit=limit,
         gender=gender
     )
     
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    
     return APIResponse(
         status="success",
         message="Members list retrieved",
         data=members,
+        pagination=Pagination(
+            total=total,
+            page=(skip // limit) + 1,
+            size=limit,
+            total_pages=total_pages
+        ),
         status_code=200
     )
 

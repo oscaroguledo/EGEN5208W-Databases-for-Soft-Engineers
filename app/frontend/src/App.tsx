@@ -431,8 +431,7 @@ export function App() {
         return (
           <HealthHistoryPage
             currentUser={currentUser}
-            members={members}
-            healthMetrics={healthMetrics} />);
+            members={members} />);
 
       case 'member-classes':
         return (
@@ -482,11 +481,7 @@ export function App() {
       case 'admin-equipment':
         return (
           <EquipmentPage
-            equipment={equipment}
-            rooms={rooms}
-            onAddEquipment={handleAddEquipment}
-            onUpdateEquipment={handleUpdateEquipment}
-            onDeleteEquipment={handleDeleteEquipment} />);
+            rooms={rooms} />);
 
 
       case 'not-found':

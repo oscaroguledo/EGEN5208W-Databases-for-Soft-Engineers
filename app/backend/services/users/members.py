@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, and_, or_, func
@@ -558,16 +558,25 @@ class MemberService:
         skip: int = 0,
         limit: int = 100,
         gender: Optional[str] = None
-    ) -> List[Member]:
+    ) -> Tuple[List[Member], int]:
         """
-        List members with optional gender filter and pagination
+        List members with optional gender filter and pagination.
+        Returns tuple of (members_list, total_count).
         """
-        query = select(Member).where(Member.deleted_at.is_(None))
+        count_query = select(func.count(Member.id)).where(Member.deleted_at.is_(None))
         if gender:
-            query = query.where(Member.gender == gender)
-        query = query.offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+            count_query = count_query.where(Member.gender == gender)
+        
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        data_query = select(Member).where(Member.deleted_at.is_(None))
+        if gender:
+            data_query = data_query.where(Member.gender == gender)
+        data_query = data_query.offset(skip).limit(limit)
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
 
     @staticmethod
     async def create_member(

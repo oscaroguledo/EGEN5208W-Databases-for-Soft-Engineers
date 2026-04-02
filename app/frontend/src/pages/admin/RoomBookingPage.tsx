@@ -16,6 +16,7 @@ import {
   Member,
   timesOverlap } from
 '@/data/types';
+import * as membersApi from '@/apis/members';
 interface RoomBookingPageProps {
   rooms: Room[];
   personalSessions: PersonalSession[];
@@ -231,31 +232,19 @@ export function RoomBookingPage({
       end_time: createForm.end_time,
       notes: createForm.notes
     };
-    if (typeof (onBookSession as any) === 'function') {
-      try {
-        await (onBookSession as any)(payload);
-        toast.success('Session created.');
-        setCreating(false);
-        return;
-      } catch (err) {
-        // continue to fallback
-      }
-    }
     try {
-      const membersApi = await import('../../apis/members');
       const res = await membersApi.bookSession(payload);
       const created = res && (res.session || res);
       if (created) {
-        // notify via onUpdateSession? parent will reflect new session if App state updated
-        toast.success('Session created.');
-        setCreating(false);
-        return;
+        onUpdateSession(created as PersonalSession);
+        toast.success('Session booked successfully');
+        setBookForm({ trainer_id: '', room_id: '', session_date: '', start_time: '', end_time: '', notes: '' });
+      } else {
+        toast.error('Failed to book session');
       }
-    } catch (err) {
-      // continue to fallback
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to book session');
     }
-    // local fallback: nothing else to update here (App state will not be modified), just notify
-    toast.success('Session created (local fallback).');
     setCreating(false);
   };
   const availableRooms =

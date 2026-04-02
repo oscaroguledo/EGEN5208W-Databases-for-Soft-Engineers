@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, and_, or_, func, text
@@ -7,6 +7,7 @@ from datetime import datetime, date, time, timedelta
 
 from models.trainings import TrainingSession, Room, Class
 from models.equipments import Equipment, EquipmentStatus
+from models.payments import Payment, PaymentStatus
 from models.users.admin_staff import AdminStaff
 from models.users.user import User, UserRole
 from core.encryption import PasswordManager
@@ -169,6 +170,117 @@ class AdminStaffService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def list_equipments(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 20,
+        status: Optional[str] = None
+    ) -> Tuple[List[Equipment], int]:
+        """
+        List equipment with pagination and optional status filter.
+        Returns tuple of (equipment_list, total_count).
+        """
+        from models.equipments import EquipmentStatus
+        
+        # Build base query
+        base_query = select(Equipment).where(Equipment.deleted_at.is_(None))
+        count_query = select(func.count(Equipment.id)).where(Equipment.deleted_at.is_(None))
+        
+        if status:
+            try:
+                status_enum = EquipmentStatus(status)
+                base_query = base_query.where(Equipment.status == status_enum)
+                count_query = count_query.where(Equipment.status == status_enum)
+            except ValueError:
+                pass  # Invalid status, ignore filter
+        
+        # Get total count
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # Get paginated data
+        data_query = base_query.offset(skip).limit(limit)
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
+
+    @staticmethod
+    async def list_sessions(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 20,
+        member_id: Optional[UUID] = None,
+        trainer_id: Optional[UUID] = None,
+        status_filter: Optional[str] = None
+    ) -> Tuple[List[TrainingSession], int]:
+        """
+        List training sessions with pagination and filters.
+        Returns tuple of (sessions_list, total_count).
+        """
+        base_query = select(TrainingSession)
+        count_query = select(func.count(TrainingSession.id))
+        
+        conditions = []
+        if member_id:
+            conditions.append(TrainingSession.member_id == member_id)
+        if trainer_id:
+            conditions.append(TrainingSession.trainer_id == trainer_id)
+        if status_filter:
+            conditions.append(TrainingSession.status == status_filter)
+        
+        if conditions:
+            base_query = base_query.where(and_(*conditions))
+            count_query = count_query.where(and_(*conditions))
+        
+        # Get total count
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # Get paginated data
+        data_query = base_query.offset(skip).limit(limit).order_by(TrainingSession.session_date.desc())
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
+
+    @staticmethod
+    async def list_payments(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 20,
+        member_id: Optional[UUID] = None,
+        subscription_id: Optional[UUID] = None,
+        status_filter: Optional[str] = None
+    ) -> Tuple[List[Payment], int]:
+        """
+        List payments with pagination and filters.
+        Returns tuple of (payments_list, total_count).
+        """
+        base_query = select(Payment)
+        count_query = select(func.count(Payment.id))
+        
+        conditions = []
+        if member_id:
+            conditions.append(Payment.member_id == member_id)
+        if subscription_id:
+            conditions.append(Payment.subscription_id == subscription_id)
+        if status_filter:
+            conditions.append(Payment.status == status_filter)
+        
+        if conditions:
+            base_query = base_query.where(and_(*conditions))
+            count_query = count_query.where(and_(*conditions))
+        
+        # Get total count
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # Get paginated data
+        data_query = base_query.offset(skip).limit(limit).order_by(Payment.created_at.desc())
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
+
+    @staticmethod
     async def get_equipment_with_view(
         db: AsyncSession,
         status_filter: str = None
@@ -233,13 +345,19 @@ class AdminStaffService:
         db: AsyncSession,
         skip: int = 0,
         limit: int = 100
-    ) -> List[AdminStaff]:
+    ) -> Tuple[List[AdminStaff], int]:
         """
-        List all admin staff with pagination
+        List all admin staff with pagination.
+        Returns tuple of (admins_list, total_count).
         """
-        query = select(AdminStaff).where(AdminStaff.deleted_at.is_(None)).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        count_query = select(func.count(AdminStaff.id)).where(AdminStaff.deleted_at.is_(None))
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        data_query = select(AdminStaff).where(AdminStaff.deleted_at.is_(None)).offset(skip).limit(limit)
+        result = await db.execute(data_query)
+        
+        return result.scalars().all(), total
 
     @staticmethod
     async def create_admin(

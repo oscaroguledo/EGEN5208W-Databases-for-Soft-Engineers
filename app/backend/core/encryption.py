@@ -1,15 +1,14 @@
+# Password hashing with bcrypt
 import bcrypt
 import asyncio
 
+
 class PasswordManager:
-    """
-    Password manager using bcrypt
-    """
+    """Async password hashing using bcrypt"""
+    
     @staticmethod
     async def hash_password(password: str) -> str:
-        """
-        Hash a plain-text password asynchronously
-        """
+        """Hash a password asynchronously"""
         loop = asyncio.get_event_loop()
         salt = bcrypt.gensalt()
         hashed = await loop.run_in_executor(None, bcrypt.hashpw, password.encode(), salt)
@@ -17,9 +16,7 @@ class PasswordManager:
 
     @staticmethod
     async def verify_password(password: str, hashed_password: str) -> bool:
-        """
-        Verify a plain-text password against a hashed password asynchronously
-        """
+        """Verify a password against a hash"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,

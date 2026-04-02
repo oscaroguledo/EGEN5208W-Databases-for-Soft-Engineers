@@ -1,64 +1,57 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIcon, FilterIcon, SearchIcon } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { ActivityIcon, FilterIcon } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Input } from '@/components/ui/Input';
-import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { Pagination } from '@/components/ui/Pagination';
 import { HealthHistorySkeleton } from '@/components/ui/Skeleton';
 import { User, Member, HealthMetric } from '@/data/types';
+import * as membersApi from '@/apis/members';
+import { usePagination } from '@/hooks/useServerPagination';
 
 interface HealthHistoryPageProps {
   currentUser: User;
   members: Member[];
-  healthMetrics: HealthMetric[];
 }
+
+const PAGE_SIZE = 8;
 
 export function HealthHistoryPage({
   currentUser,
   members,
-  healthMetrics
 }: HealthHistoryPageProps) {
-  console.log('HealthHistoryPage component rendering!', {
-    currentUser,
-    members: members.length,
-    healthMetrics: healthMetrics.length
-  });
-  
-  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 450);
-    return () => clearTimeout(t);
-  }, []);
-  
   const member = members.find((m) => m.user_id === currentUser.user_id);
-  // compute metrics safely (may be empty if member not found)
+
+  // Server-side pagination for health metrics
+  const fetchHealthMetrics = useCallback(async (skip: number, limit: number) => {
+    if (!member) return { status: 'success', message: '', data: [], pagination: { total: 0, page: 1, size: limit, total_pages: 1 }, status_code: 200 };
+    const res = await membersApi.listHealthHistory(skip, limit);
+    return res;
+  }, [member]);
+
+  const {
+    data: healthMetrics,
+    isLoading,
+    currentPage,
+    totalPages,
+    totalItems,
+    setPage,
+  } = usePagination<HealthMetric>(fetchHealthMetrics, { pageSize: PAGE_SIZE });
+
+  // Filter metrics for current member and apply client-side filter/search
   const myMetrics = member
     ? healthMetrics
-        .filter((m) => m.member_id === member.member_id)
-        .filter((m) => !filterType || m.metric_type === filterType)
-        .filter((m) => !searchTerm || 
+        .filter((m: HealthMetric) => m.member_id === member.member_id)
+        .filter((m: HealthMetric) => !filterType || m.metric_type === filterType)
+        .filter((m: HealthMetric) => !searchTerm || 
           m.metric_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
           m.unit.toLowerCase().includes(searchTerm.toLowerCase()) ||
           m.value.toString().includes(searchTerm)
         )
-        .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
     : [];
-
-  // Call pagination hook unconditionally to preserve hooks order
-  const pagination = usePagination(myMetrics, 8);
-  
-  // Debug pagination data
-  console.log('Pagination Debug:', {
-    myMetricsLength: myMetrics.length,
-    currentPage: pagination.currentPage,
-    totalPages: pagination.totalPages,
-    totalItems: pagination.totalItems,
-    pageSize: pagination.pageSize,
-    paginatedLength: pagination.paginated.length
-  });
 
   // Early returns (render skeleton or not-found) after hooks
   if (!member) {
@@ -76,15 +69,10 @@ export function HealthHistoryPage({
     );
   }
 
-  if (loading) return <HealthHistorySkeleton />;
+  if (isLoading && healthMetrics.length === 0) return <HealthHistorySkeleton />;
   
-  const metricTypes = [
-    ...new Set(
-      healthMetrics.
-        filter((m) => m.member_id === member.member_id).
-        map((m) => m.metric_type)
-    )
-  ];
+  // Note: For metric types, we could fetch from a separate endpoint
+  const metricTypes = [...new Set(healthMetrics.map((m) => m.metric_type))];
 
   const filterOptions = [
     {
@@ -97,14 +85,6 @@ export function HealthHistoryPage({
     }))
   ];
 
-  const typeColors: Record<string, string> = {
-    Weight: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-    'Heart Rate': 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-    BMI: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
-    'Blood Pressure': 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
-    'Body Fat': 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
-  };
-
   const typeDotColors: Record<string, string> = {
     Weight: 'bg-blue-400',
     'Heart Rate': 'bg-red-400',
@@ -115,11 +95,6 @@ export function HealthHistoryPage({
 
   return (
     <div>
-      {/* Debug test - this should always be visible */}
-      <div className="bg-red-500 text-white p-2 mb-4">
-        HealthHistoryPage is rendering! Loading: {loading ? 'YES' : 'NO'}
-      </div>
-      
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           Health History
@@ -161,7 +136,7 @@ export function HealthHistoryPage({
 
       {/* Metrics Grid */}
       <Card>
-        {pagination.paginated.length === 0 ? (
+        {myMetrics.length === 0 ? (
           <div className="py-8 text-center">
             <ActivityIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400 dark:text-slate-500">
@@ -179,7 +154,7 @@ export function HealthHistoryPage({
           </div>
         ) : (
           <div className="space-y-3">
-            {pagination.paginated.map((m) => (
+            {myMetrics.map((m) => (
               <div
                 key={m.metric_id}
                 className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"
@@ -215,14 +190,14 @@ export function HealthHistoryPage({
         )}
       </Card>
 
-      {/* Pagination - Always show for better UX */}
+      {/* Pagination */}
       <div className="mt-6 flex justify-center">
         <Pagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          onPageChange={pagination.setCurrentPage}
-          totalItems={pagination.totalItems}
-          pageSize={pagination.pageSize}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalItems}
+          pageSize={PAGE_SIZE}
         />
       </div>
     </div>
