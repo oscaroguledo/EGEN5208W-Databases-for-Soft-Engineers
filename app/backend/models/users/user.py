@@ -1,4 +1,5 @@
 # User model - stores authentication and role information
+import enum
 from sqlalchemy import Column, String, Enum, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -7,7 +8,7 @@ import uuid
 from datetime import datetime
 
 # Available user roles in the system
-class UserRole(str, Enum):
+class UserRole(enum.Enum):
     admin = "admin"
     trainer = "trainer"
     member = "member"
