@@ -1,0 +1,50 @@
+# Member model - stores gym member profile information
+from core.db import Base
+from sqlalchemy import Column, UUID, ForeignKey, String, DateTime
+from sqlalchemy.orm import relationship
+from sqlalchemy import Enum
+from datetime import datetime
+import enum
+from sqlalchemy import Date
+
+
+class Gender(enum.Enum):
+    """Member gender options"""
+    male = "male"
+    female = "female"
+
+
+class Member(Base):
+    """Gym member profile model"""
+    __tablename__ = "members"
+
+    id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
+    full_name = Column(String, nullable=False)
+    date_of_birth = Column(Date, nullable=False)
+    gender = Column(Enum(Gender, name="gender", create_type=False), nullable=False)
+    phone = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Relationships
+    user = relationship("User", back_populates="member")
+    subscriptions = relationship("MemberSubscription", back_populates="member")
+    fitness_goals = relationship("FitnessGoal", back_populates="member")
+    health_metrics = relationship("HealthMetric", back_populates="member")
+    enrollments = relationship("Enrollment", back_populates="member")
+    training_sessions = relationship("TrainingSession", back_populates="member")
+    payments = relationship("Payment", back_populates="member")
+
+    def __repr__(self):
+        return f"<Member(id='{self.id}', full_name='{self.full_name}', phone='{self.phone}')>"
+
+    def to_dict(self):
+        """Convert member to dictionary for API responses"""
+        return {
+            "id": str(self.id),
+            "full_name": self.full_name,
+            "date_of_birth": self.date_of_birth.isoformat() if self.date_of_birth else None,
+            "gender": self.gender.value if self.gender else None,
+            "phone": self.phone,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

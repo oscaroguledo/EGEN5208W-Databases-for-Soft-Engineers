@@ -32,7 +32,9 @@ The video demonstrates all 8 required operations:
 # 1. Clone and navigate
 git clone https://github.com/oscaroguledo/EGEN5208W-Databases-for-Soft-Engineers.git
 cd EGEN5208W-Databases-for-Soft-Engineers/app
-
+# OR
+# Download the project as a zip file and extract it
+# EGEN5208W_FinalProject_OSCAROGULEDO_101395378.zip
 # 2. Start all services
 docker compose up --build
 
