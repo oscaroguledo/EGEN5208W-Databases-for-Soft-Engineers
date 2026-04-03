@@ -103,9 +103,9 @@ export function Dropdown({
                   No options available
                 </div> :
 
-            options.map((option) =>
+            options.map((option, i) =>
             <button
-              key={option.value}
+              key={`${option.value}-${i}`}
               type="button"
               role="option"
               aria-selected={option.value === value}

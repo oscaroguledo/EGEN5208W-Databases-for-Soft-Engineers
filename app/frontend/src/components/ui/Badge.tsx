@@ -40,9 +40,10 @@ export function RoleBadge({ role }: {role: string;}) {
     trainer: 'info',
     admin: 'warning'
   };
+  const safeRole = role || 'member';
   return (
-    <Badge variant={map[role] || 'neutral'}>
-      {role.charAt(0).toUpperCase() + role.slice(1)}
+    <Badge variant={map[safeRole] || 'neutral'}>
+      {safeRole.charAt(0).toUpperCase() + safeRole.slice(1)}
     </Badge>);
 
 }
@@ -56,5 +57,6 @@ export function StatusBadge({ status }: {status: string;}) {
     cancelled: 'danger',
     completed: 'neutral'
   };
-  return <Badge variant={map[status] || 'neutral'}>{status}</Badge>;
+  const safeStatus = status || 'unknown';
+  return <Badge variant={map[safeStatus] || 'neutral'}>{safeStatus}</Badge>;
 }

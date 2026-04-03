@@ -3,7 +3,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: ${DOCKERFILE:-Dockerfile}
+      dockerfile: Dockerfile
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
@@ -22,12 +22,11 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: ${DOCKERFILE:-Dockerfile}
+      dockerfile: Dockerfile
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./backend/src:/app/src
-      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend:/app
       - ../sql:/app/sql  # Mount SQL files for database initialization
     environment:
       - PYTHONPATH=/app
@@ -59,7 +58,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gym_user} -d ${POSTGRES_DB:-gym_db}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

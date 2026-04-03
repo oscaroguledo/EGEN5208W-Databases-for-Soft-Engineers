@@ -141,11 +141,7 @@ INSERT INTO enrollments (member_id, class_id, registered_at) VALUES
 
 -- Carol Davis's enrollments
 ((SELECT id FROM members WHERE full_name = 'Carol Davis'), (SELECT id FROM classes WHERE name = 'Yoga Basics' AND class_date = '2024-03-01'), '2024-02-27 14:00:00'),
-((SELECT id FROM members WHERE full_name = 'Carol Davis'), (SELECT id FROM classes WHERE name = 'Spinning Class' AND class_date = '2024-03-04'), '2024-02-27 14:01:00'),
-
--- Fill some classes to capacity for testing (HIIT Training - capacity 12, add 10 more members)
-((SELECT id FROM members WHERE full_name = 'Alice Wilson'), (SELECT id FROM classes WHERE name = 'HIIT Training' AND class_date = '2024-03-01'), '2024-02-25 10:01:00'),
-((SELECT id FROM members WHERE full_name = 'Bob Brown'), (SELECT id FROM classes WHERE name = 'HIIT Training' AND class_date = '2024-03-01'), '2024-02-26 11:00:00');
+((SELECT id FROM members WHERE full_name = 'Carol Davis'), (SELECT id FROM classes WHERE name = 'Spinning Class' AND class_date = '2024-03-04'), '2024-02-27 14:01:00');
 
 -- Insert Training Sessions
 INSERT INTO training_sessions (trainer_id, member_id, room_id, session_date, start_time, end_time, status) VALUES
@@ -169,9 +165,9 @@ INSERT INTO training_sessions (trainer_id, member_id, room_id, session_date, sta
 ((SELECT id FROM trainers WHERE full_name = 'John Smith'), (SELECT id FROM members WHERE full_name = 'Carol Davis'), (SELECT id FROM rooms WHERE name = 'Studio B'), '2024-02-17', '15:00:00', '16:00:00', 'completed');
 
 -- Insert some past classes for testing history
-INSERT INTO classes (name, trainer_id, room_id, class_date, start_time, end_time, max_capacity, created_at, deleted_at) VALUES
-('Past Yoga Class', (SELECT id FROM trainers WHERE full_name = 'Sarah Johnson'), (SELECT id FROM rooms WHERE name = 'Studio A'), '2024-02-10', '09:00:00', '10:00:00', 10, '2024-02-01 08:00:00', '2024-02-10 10:01:00'),
-('Past HIIT Class', (SELECT id FROM trainers WHERE full_name = 'John Smith'), (SELECT id FROM rooms WHERE name = 'Studio B'), '2024-02-12', '11:00:00', '12:00:00', 12, '2024-02-01 08:00:00', '2024-02-12 12:01:00');
+INSERT INTO classes (name, trainer_id, room_id, class_date, start_time, end_time, max_capacity, created_at) VALUES
+('Past Yoga Class', (SELECT id FROM trainers WHERE full_name = 'Sarah Johnson'), (SELECT id FROM rooms WHERE name = 'Studio A'), '2024-02-10', '09:00:00', '10:00:00', 10, '2024-02-01 08:00:00'),
+('Past HIIT Class', (SELECT id FROM trainers WHERE full_name = 'John Smith'), (SELECT id FROM rooms WHERE name = 'Studio B'), '2024-02-12', '11:00:00', '12:00:00', 12, '2024-02-01 08:00:00');
 
 -- Insert enrollments for past classes
 INSERT INTO enrollments (member_id, class_id, registered_at) VALUES

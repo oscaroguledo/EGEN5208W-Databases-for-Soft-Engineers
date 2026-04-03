@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClockIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { ClockIcon, PlusIcon, Trash2Icon, PencilIcon } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,13 +19,14 @@ interface AvailabilityPageProps {
 
 export function AvailabilityPage({
   currentUser,
-  onAddAvailability, onDeleteAvailability,
+  onAddAvailability, onUpdateAvailability, onDeleteAvailability,
 }: AvailabilityPageProps) {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [trainer, setTrainer]   = useState<Trainer | null>(null);
   const [mySlots, setMySlots]   = useState<TrainerAvailability[]>([]);
   const [form, setForm]         = useState({ available_date: '', start_at: '', end_at: '' });
+  const [editingSlot, setEditingSlot] = useState<TrainerAvailability | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -73,9 +74,61 @@ export function AvailabilityPage({
       setForm({ available_date: '', start_at: '', end_at: '' });
       toast.success(`Availability added for ${form.available_date}.`);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to add availability.');
+      toast.error(err?.message || err?.response?.data?.message || 'Failed to add availability.');
     }
     setSaving(false);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSlot) return;
+    if (!form.available_date || !form.start_at || !form.end_at) { toast.error('All fields are required.'); return; }
+    if (form.end_at <= form.start_at) { toast.error('End time must be after start time.'); return; }
+    setSaving(true);
+    try {
+      await trainersApi.updateAvailability(editingSlot.id, form.available_date, form.start_at, form.end_at);
+      const updatedSlot: TrainerAvailability = {
+        ...editingSlot,
+        available_date: form.available_date,
+        start_at: form.start_at,
+        end_at: form.end_at,
+      };
+      setMySlots(prev => prev.map(s => s.id === editingSlot.id ? updatedSlot : s).sort((a, b) =>
+        a.available_date.localeCompare(b.available_date) || a.start_at.localeCompare(b.start_at)
+      ));
+      onUpdateAvailability(updatedSlot);
+      setEditingSlot(null);
+      setForm({ available_date: '', start_at: '', end_at: '' });
+      toast.success('Availability updated successfully.');
+    } catch (err: any) {
+      toast.error(err?.message || err?.response?.data?.message || 'Failed to update availability.');
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (slotId: string) => {
+    try {
+      await trainersApi.deleteAvailability(slotId);
+      setMySlots(prev => prev.filter(s => s.id !== slotId));
+      onDeleteAvailability(slotId);
+      toast.success('Slot deleted.');
+    } catch (err: any) {
+      toast.error(err?.message || err?.response?.data?.message || 'Failed to delete slot.');
+    }
+  };
+
+  const startEditing = (slot: TrainerAvailability) => {
+    setEditingSlot(slot);
+    setForm({
+      available_date: slot.available_date,
+      start_at: slot.start_at,
+      end_at: slot.end_at,
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingSlot(null);
+    setForm({ available_date: '', start_at: '', end_at: '' });
   };
 
   return (
@@ -88,18 +141,25 @@ export function AvailabilityPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div>
           <Card>
-            <CardHeader title="Add Slot" subtitle="Define a new available time" />
-            <form onSubmit={handleAdd} className="space-y-4">
+            <CardHeader title={editingSlot ? 'Edit Slot' : 'Add Slot'} subtitle={editingSlot ? 'Update availability time' : 'Define a new available time'} />
+            <form onSubmit={editingSlot ? handleUpdate : handleAdd} className="space-y-4">
               <Input label="Date" type="date" value={form.available_date}
                 onChange={e => setForm(f => ({ ...f, available_date: e.target.value }))} />
               <Input label="Start Time" type="time" value={form.start_at}
                 onChange={e => setForm(f => ({ ...f, start_at: e.target.value }))} />
               <Input label="End Time" type="time" value={form.end_at}
                 onChange={e => setForm(f => ({ ...f, end_at: e.target.value }))} />
-              <Button type="submit" variant="primary" className="w-full" loading={saving}>
-                <PlusIcon className="w-4 h-4" />
-                {saving ? 'Adding…' : 'Add Slot'}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary" className="flex-1" loading={saving}>
+                  <PlusIcon className="w-4 h-4" />
+                  {saving ? (editingSlot ? 'Saving…' : 'Adding…') : (editingSlot ? 'Save Changes' : 'Add Slot')}
+                </Button>
+                {editingSlot && (
+                  <Button type="button" variant="secondary" onClick={cancelEditing}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
             </form>
           </Card>
         </div>
@@ -141,14 +201,16 @@ export function AvailabilityPage({
                         </div>
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => {
-                        setMySlots(prev => prev.filter(s => s.id !== slot.id));
-                        onDeleteAvailability(slot.id);
-                        toast.success('Slot deleted.');
-                      }}>
-                      <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => startEditing(slot)}>
+                        <PencilIcon className="w-3.5 h-3.5 text-slate-400" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleDelete(slot.id)}>
+                        <Trash2Icon className="w-3.5 h-3.5 text-red-400" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -10,6 +10,8 @@ import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { usePagination } from '@/hooks/useServerPagination';
 import { Pagination } from '@/components/ui/Pagination';
 
+export type Page = 'login' | 'register' | 'member-dashboard' | 'member-profile' | 'member-health' | 'member-classes' | 'trainer-availability' | 'trainer-schedule' | 'admin-rooms' | 'admin-equipment' | 'not-found' | 'maintenance';
+
 interface DashboardPageProps {
   currentUser: User;
   members: Member[];
@@ -19,11 +21,12 @@ interface DashboardPageProps {
   rooms: Room[];
   onBookSession?: (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string }) => Promise<any>;
   onAddSession?: (session: TrainingSession) => void;
+  onNavigate?: (page: Page) => void;
 }
 
 const PAGE_SIZE = 4;
 
-export function DashboardPage({ currentUser, rooms, onBookSession, onAddSession }: DashboardPageProps) {
+export function DashboardPage({ currentUser, rooms, onBookSession, onAddSession, onNavigate }: DashboardPageProps) {
   const [member, setMember]                   = useState<Member | null>(null);
   const [myMetrics, setMyMetrics]             = useState<HealthMetric[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<TrainingSession[]>([]);
@@ -91,7 +94,7 @@ export function DashboardPage({ currentUser, rooms, onBookSession, onAddSession 
       toast.success('Session booked successfully.');
       setBookingOpen(false);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to book session.');
+      toast.error(err?.response?.data?.message || 'Failed to book session.');
     }
   };
 
@@ -192,38 +195,11 @@ export function DashboardPage({ currentUser, rooms, onBookSession, onAddSession 
               <CalendarIcon className="w-10 h-10 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
               <p className="text-sm text-slate-400 dark:text-slate-500">No upcoming sessions.</p>
               <div className="mt-4">
-                <button className="text-sm text-teal-600 hover:underline" onClick={() => setBookingOpen(o => !o)}>
-                  {bookingOpen ? 'Cancel' : 'Book a Session'}
+                <button 
+                  className="text-sm text-teal-600 hover:underline" 
+                  onClick={() => onNavigate?.('member-classes')}>
+                  Book a Session
                 </button>
-                {bookingOpen && (
-                  <form onSubmit={handleBookSession} className="mt-3 space-y-2 max-w-md mx-auto text-left">
-                    <div>
-                      <label className="text-xs text-slate-500">Trainer</label>
-                      <select className="w-full mt-1 p-2 border rounded" value={bookingForm.trainer_id}
-                        onChange={e => setBookingForm(f => ({ ...f, trainer_id: e.target.value }))}>
-                        {sessionTrainers.map((t: Trainer) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500">Room</label>
-                      <select className="w-full mt-1 p-2 border rounded" value={bookingForm.room_id}
-                        onChange={e => setBookingForm(f => ({ ...f, room_id: e.target.value }))}>
-                        {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input type="date" className="p-2 border rounded" value={bookingForm.session_date}
-                        onChange={e => setBookingForm(f => ({ ...f, session_date: e.target.value }))} />
-                      <input type="time" className="p-2 border rounded" value={bookingForm.start_time}
-                        onChange={e => setBookingForm(f => ({ ...f, start_time: e.target.value }))} />
-                      <input type="time" className="p-2 border rounded" value={bookingForm.end_time}
-                        onChange={e => setBookingForm(f => ({ ...f, end_time: e.target.value }))} />
-                    </div>
-                    <div className="text-right">
-                      <button type="submit" className="px-3 py-2 bg-teal-600 text-white rounded">Confirm Booking</button>
-                    </div>
-                  </form>
-                )}
               </div>
             </div>
           ) : (

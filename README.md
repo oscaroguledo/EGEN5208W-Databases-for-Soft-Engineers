@@ -35,7 +35,7 @@ The video demonstrates all 8 required operations:
 
 ```bash
 # 1. Clone and navigate
-git clone <repository-url>
+git clone https://github.com/oscaroguledo/EGEN5208W-Databases-for-Soft-Engineers.git
 cd EGEN5208W-Databases-for-Soft-Engineers
 
 # 2. Start all services

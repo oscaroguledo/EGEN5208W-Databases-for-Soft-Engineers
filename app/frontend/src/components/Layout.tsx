@@ -17,7 +17,7 @@ type Page =
 'not-found' |
 'maintenance';
 interface LayoutProps {
-  currentUser: User;
+  currentUser: User | null;
   currentPage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
@@ -31,44 +31,37 @@ export function Layout({
   children
 }: LayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isLoggedIn = !!currentUser;
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-      <Sidebar
-        currentUser={currentUser}
-        currentPage={currentPage}
-        onNavigate={onNavigate}
-        onLogout={onLogout}
-        mobileOpen={mobileSidebarOpen}
-        onMobileClose={() => setMobileSidebarOpen(false)} />
+      {isLoggedIn && (
+        <Sidebar
+          currentUser={currentUser}
+          currentPage={currentPage}
+          onNavigate={onNavigate}
+          onLogout={onLogout}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)} />
+      )}
 
-
-      <div className="flex-1 lg:ml-64 min-h-screen flex flex-col">
+      <div className={`flex-1 min-h-screen flex flex-col ${isLoggedIn ? 'lg:ml-64' : ''}`}>
         {/* Mobile top bar */}
         <motion.header
           className="lg:hidden sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm"
-          initial={{
-            y: -48,
-            opacity: 0
-          }}
-          animate={{
-            y: 0,
-            opacity: 1
-          }}
-          transition={{
-            duration: 0.3,
-            ease: 'easeOut'
-          }}>
+          initial={{ y: -48, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}>
 
-          <motion.button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            aria-label="Open menu"
-            whileTap={{
-              scale: 0.9
-            }}>
+          {isLoggedIn && (
+            <motion.button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              aria-label="Open menu"
+              whileTap={{ scale: 0.9 }}>
 
-            <MenuIcon className="w-5 h-5" />
-          </motion.button>
+              <MenuIcon className="w-5 h-5" />
+            </motion.button>
+          )}
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-teal-500 rounded-md flex items-center justify-center">
               <span className="text-white text-xs font-bold">F</span>

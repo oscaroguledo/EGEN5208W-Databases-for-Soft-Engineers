@@ -21,7 +21,7 @@ interface RoomBookingPageProps {
   members: Member[];
   onUpdateSession: (s: TrainingSession) => void;
   onUpdateClass: (c: GroupClass) => void;
-  onBookSession?: (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string }) => Promise<any>;
+  onBookSession?: (payload: { trainer_id: string; room_id: string; session_date: string; start_time: string; end_time: string; member_id?: string }) => Promise<any>;
 }
 
 export function RoomBookingPage({
@@ -41,6 +41,7 @@ export function RoomBookingPage({
   const [createForm, setCreateForm]   = useState({
     trainer_id: trainers[0]?.id ?? '',
     room_id: rooms[0]?.id ?? '',
+    member_id: members[0]?.id ?? '',
     session_date: new Date().toISOString().split('T')[0],
     start_time: '09:00', end_time: '10:00',
   });
@@ -81,14 +82,14 @@ export function RoomBookingPage({
         if (s) onUpdateSession({ ...s, room_id: selectedRoomId });
         toast.success('Room assigned to session.');
       } else {
-        // class room assignment not yet in API — update locally
+        await adminApi.assignRoomToClass(targetId, selectedRoomId);
         const c = groupClasses.find(x => x.id === targetId);
         if (c) onUpdateClass({ ...c, room_id: selectedRoomId });
         toast.success('Room assigned to class.');
       }
       setTargetId(''); setSelectedRoomId('');
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to assign room.');
+      toast.error(err?.response?.data?.message || 'Failed to assign room.');
     }
     setAssigning(false);
   };
@@ -100,7 +101,7 @@ export function RoomBookingPage({
       const res = await (onBookSession ? onBookSession(createForm) : membersApi.bookSession(createForm));
       if (res) { onUpdateSession(res as TrainingSession); toast.success('Session created.'); }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to create session.');
+      toast.error(err?.response?.data?.message || 'Failed to create session.');
     }
     setCreating(false);
   };
@@ -169,6 +170,10 @@ export function RoomBookingPage({
           <Card>
             <CardHeader title="Create Session" subtitle="Admin: create a personal session" />
             <form onSubmit={handleCreateSession} className="space-y-3">
+              <Dropdown label="Member" value={createForm.member_id}
+                onChange={v => setCreateForm(f => ({ ...f, member_id: v }))}
+                options={members.map(m => ({ value: m.id, label: m.full_name }))}
+                placeholder="Select member…" />
               <Dropdown label="Trainer" value={createForm.trainer_id}
                 onChange={v => setCreateForm(f => ({ ...f, trainer_id: v }))}
                 options={trainers.map(t => ({ value: t.id, label: t.full_name }))} />

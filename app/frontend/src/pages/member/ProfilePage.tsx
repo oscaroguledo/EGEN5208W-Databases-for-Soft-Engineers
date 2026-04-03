@@ -54,18 +54,19 @@ export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetri
   }, []);
 
   const { data: goalsData, currentPage: goalsPage, totalPages: goalsTotalPages,
-    totalItems: goalsTotalItems, setPage: setGoalsPage } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
+    totalItems: goalsTotalItems, setPage: setGoalsPage, refresh: refreshGoals } = usePagination<FitnessGoal>(fetchGoals, { pageSize: PAGE_SIZE });
 
   const fetchMetrics = useCallback(async (skip: number, limit: number) => {
     return membersApi.listHealthHistory(skip, limit);
   }, []);
 
   const { data: metricsData, currentPage: metricsPage, totalPages: metricsTotalPages,
-    totalItems: metricsTotalItems, setPage: setMetricsPage } = usePagination<HealthMetric>(fetchMetrics, { pageSize: PAGE_SIZE });
+    totalItems: metricsTotalItems, setPage: setMetricsPage, refresh: refreshMetrics } = usePagination<HealthMetric>(fetchMetrics, { pageSize: PAGE_SIZE });
 
   const [profileForm, setProfileForm] = useState({ full_name: '', phone: '' });
   const [goalForm, setGoalForm]       = useState({ description: '', target_value: '' });
   const [metricForm, setMetricForm]   = useState({ metric_type: '', value: '' });
+  const [editingGoal, setEditingGoal] = useState<FitnessGoal | null>(null);
 
   // Sync form once member data loads
   useEffect(() => {
@@ -84,20 +85,39 @@ export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetri
       setMember(updated as Member);
       onUpdateMember(updated as Member);
       toast.success('Profile updated successfully.');
-    } catch { toast.error('Failed to update profile.'); }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to update profile.'); }
     setSavingProfile(false);
   };
 
-  const handleAddGoal = async (e: React.FormEvent) => {
+  const handleAddOrUpdateGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goalForm.description.trim()) { toast.error('Description is required.'); return; }
     setSavingGoal(true);
     try {
-      const results = await membersApi.updateGoals([{ description: goalForm.description, target_value: goalForm.target_value || null }]);
-      const created = Array.isArray(results) ? results[0] : results;
-      if (created) { onAddGoal(created as FitnessGoal); setGoalForm({ description: '', target_value: '' }); toast.success('Goal added.'); }
-    } catch { toast.error('Failed to add goal.'); }
+      const goalData = editingGoal 
+        ? { id: editingGoal.id, description: goalForm.description, target_value: goalForm.target_value || null }
+        : { description: goalForm.description, target_value: goalForm.target_value || null };
+      const results = await membersApi.updateGoals([goalData]);
+      const saved = Array.isArray(results) ? results[0] : results;
+      if (saved) { 
+        onAddGoal(saved as FitnessGoal); 
+        setGoalForm({ description: '', target_value: '' }); 
+        setEditingGoal(null);
+        refreshGoals();
+        toast.success(editingGoal ? 'Goal updated.' : 'Goal added.'); 
+      }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to save goal.'); }
     setSavingGoal(false);
+  };
+
+  const handleEditGoal = (goal: FitnessGoal) => {
+    setEditingGoal(goal);
+    setGoalForm({ description: goal.description, target_value: goal.target_value || '' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingGoal(null);
+    setGoalForm({ description: '', target_value: '' });
   };
 
   const handleAddMetric = async (e: React.FormEvent) => {
@@ -108,8 +128,9 @@ export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetri
       const res = await membersApi.addHealthMetric(metricForm.metric_type, parseFloat(metricForm.value));
       onAddMetric(res as HealthMetric);
       setMetricForm({ metric_type: '', value: '' });
+      refreshMetrics();
       toast.success(`${metricForm.metric_type} recorded.`);
-    } catch { toast.error('Failed to record metric.'); }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to record metric.'); }
     setSavingMetric(false);
   };
 
@@ -180,15 +201,22 @@ export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetri
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <Card>
-              <CardHeader title="Add Fitness Goal" subtitle="Set a new target for your fitness journey" />
-              <form onSubmit={handleAddGoal} className="space-y-4">
+              <CardHeader title={editingGoal ? 'Edit Fitness Goal' : 'Add Fitness Goal'} subtitle={editingGoal ? 'Update your fitness target' : 'Set a new target for your fitness journey'} />
+              <form onSubmit={handleAddOrUpdateGoal} className="space-y-4">
                 <Input label="Description *" placeholder="e.g. Run 5km without stopping"
                   value={goalForm.description} onChange={e => setGoalForm(f => ({ ...f, description: e.target.value }))} />
                 <Input label="Target Value" placeholder="e.g. 5km, 70kg, 30 min"
                   value={goalForm.target_value} onChange={e => setGoalForm(f => ({ ...f, target_value: e.target.value }))} />
-                <Button type="submit" variant="primary" loading={savingGoal}>
-                  {savingGoal ? 'Adding…' : 'Add Goal'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary" loading={savingGoal}>
+                    {savingGoal ? (editingGoal ? 'Saving…' : 'Adding…') : (editingGoal ? 'Save Changes' : 'Add Goal')}
+                  </Button>
+                  {editingGoal && (
+                    <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </form>
             </Card>
           </div>
@@ -206,7 +234,17 @@ export function ProfilePage({ currentUser, onUpdateMember, onAddGoal, onAddMetri
                     <div key={g.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{g.description}</span>
-                        <Badge variant="teal">Active</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="teal">Active</Badge>
+                          <button 
+                            onClick={() => handleEditGoal(g)}
+                            className="p-1 text-slate-400 hover:text-teal-600 transition-colors"
+                            title="Edit goal">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       {g.target_value && (
                         <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">Target: {g.target_value}</div>

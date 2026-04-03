@@ -96,6 +96,7 @@ export async function cancelClassEnrollment(class_id: string) {
 export async function bookSession(payload: {
   trainer_id: string; room_id: string;
   session_date: string; start_time: string; end_time: string;
+  member_id?: string;
 }) {
   // Backend expects query params for this endpoint
   const res = await api.post('/members/book-session', null, { params: payload });

@@ -66,7 +66,7 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
       await adminApi.updateEquipmentStatus(eq.id, newStatus);
       toast.success(`"${eq.equipment_name}" updated to ${STATUS_DISPLAY[newStatus] || newStatus}.`);
       refresh();
-    } catch { toast.error('Failed to update status.'); }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to update status.'); }
   };
 
   const openEdit = (eq: Equipment) => {
@@ -91,7 +91,7 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
       setEditing(null);
       setNewForm({ equipment_name: '', room_id: '', status: 'operational', notes: '' });
       refresh();
-    } catch { toast.error('Failed to save equipment.'); }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to save equipment.'); }
   };
 
   const handleDelete = async (eq: Equipment) => {
@@ -99,7 +99,7 @@ export function EquipmentPage({ rooms }: EquipmentPageProps) {
       await adminApi.deleteEquipment(eq.id);
       toast.success(`"${eq.equipment_name}" deleted.`);
       refresh();
-    } catch { toast.error('Failed to delete equipment.'); }
+    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to delete equipment.'); }
   };
 
   if (isLoading && equipment.length === 0) return <EquipmentSkeleton />;

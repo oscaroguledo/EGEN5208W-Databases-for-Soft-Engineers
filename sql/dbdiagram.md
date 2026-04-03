@@ -210,11 +210,6 @@ Table enrollments {
     (class_id, member_id) [unique, name: 'idx_enrollments_unique', note: 'Prevent duplicate enrollments - one per member per class']
   }
 }
-Enum session_status {
-  scheduled
-  cancelled
-  completed
-}
 
 // ============================================================================
 // PERSONAL TRAINING SESSIONS
@@ -240,11 +235,6 @@ Table training_sessions {
     (member_id, session_date) [name: 'idx_sessions_member_date', note: 'Query sessions by member - used for dashboard']
   }
 }
-Enum equipment_status {
-  operational
-  under_repair
-  out_of_service
-}
 
 Table equipments {
   id uuid [primary key, note: 'Gym equipment inventory']
@@ -255,12 +245,7 @@ Table equipments {
   created_at timestamp [not null, default: `now()`]
   updated_at timestamp [not null, default: `now()`]
 }
-Enum payment_status {
-  pending
-  paid
-  failed
-  refunded
-}
+
 // ============================================================================
 // BILLING & PAYMENTS
 // ============================================================================

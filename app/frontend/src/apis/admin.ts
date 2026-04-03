@@ -62,6 +62,11 @@ export async function assignRoomToSession(session_id: string, room_id: string) {
   return handleAxiosResponse(res);
 }
 
+export async function assignRoomToClass(class_id: string, room_id: string) {
+  const res = await api.put(`/admin/classes/${class_id}/room`, { room_id });
+  return handleAxiosResponse(res);
+}
+
 export async function listSessions(skip = 0, limit = 20, member_id?: string, trainer_id?: string, status_filter?: string) {
   const params: any = { skip, limit };
   if (member_id) params.member_id = member_id;

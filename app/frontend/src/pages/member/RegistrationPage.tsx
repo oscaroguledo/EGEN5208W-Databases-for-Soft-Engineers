@@ -127,7 +127,7 @@ export function RegistrationPage({ onRegister, onGoBack }: RegistrationPageProps
         setTouched({});
         if (onGoBack) onGoBack();
       } catch (err: any) {
-        toast.error(err?.message || 'Registration failed. Please try again.');
+       toast.error(err?.response?.data?.message || err.message || 'Registration failed. Please try again.');
       } finally {
         setLoading(false);
       }

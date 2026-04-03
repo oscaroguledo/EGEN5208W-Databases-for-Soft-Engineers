@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
@@ -57,10 +57,7 @@ async def create_class(
             status_code=201
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        return APIResponse.error(message=str(e), status_code=400)
 
 class AssignRoomRequest(BaseModel):
     """Assign room to session request"""
@@ -74,7 +71,7 @@ async def assign_room_to_session(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Assign room to training session"""
+    """Assign or modify room for training session"""
     try:
         session = await AdminStaffService.book_room_for_session(
             db=db,
@@ -89,10 +86,58 @@ async def assign_room_to_session(
             status_code=200
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        return APIResponse.error(message=str(e), status_code=409)
+
+@router.put("/classes/{class_id}/room", response_model=APIResponse[dict])
+async def assign_room_to_class(
+    class_id: UUID,
+    data: AssignRoomRequest,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Assign or modify room for fitness class"""
+    from sqlalchemy.future import select as sa_select
+    from sqlalchemy import update as sa_update
+    from models.trainings import Class as ClassModel
+    
+    # Get the class
+    result = await db.execute(
+        sa_select(ClassModel).where(ClassModel.id == class_id)
+    )
+    class_obj = result.scalar_one_or_none()
+    
+    if not class_obj:
+        return APIResponse.error(message="Class not found", status_code=404)
+    
+    # Check for room conflicts
+    conflict_q = sa_select(ClassModel).where(
+        ClassModel.room_id == data.room_id,
+        ClassModel.class_date == class_obj.class_date,
+        ClassModel.id != class_id,
+        or_(
+            and_(ClassModel.start_time <= class_obj.start_time, ClassModel.end_time > class_obj.start_time),
+            and_(ClassModel.start_time < class_obj.end_time, ClassModel.end_time >= class_obj.end_time),
+            and_(ClassModel.start_time >= class_obj.start_time, ClassModel.end_time <= class_obj.end_time),
+        ),
+    )
+    conflict_result = await db.execute(conflict_q)
+    if conflict_result.scalars().first():
+        return APIResponse.error(
+            message=f"Room is already booked during this time slot",
+            status_code=409
         )
+    
+    # Update room assignment
+    class_obj.room_id = data.room_id
+    await db.commit()
+    await db.refresh(class_obj)
+    
+    return APIResponse(
+        status="success",
+        message="Room assigned to class",
+        data={"class_id": str(class_obj.id), "room_id": str(data.room_id)},
+        status_code=200
+    )
 
 @router.get("/equipment", response_model=APIResponse[List])
 async def list_equipment_paginated(
@@ -172,10 +217,7 @@ async def update_equipment_status(
         )
         
         if not equipment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Equipment not found"
-            )
+            return APIResponse.error(message="Equipment not found", status_code=404)
         
         return APIResponse(
             status="success",
@@ -184,10 +226,7 @@ async def update_equipment_status(
             status_code=200
         )
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid equipment status"
-        )
+        return APIResponse.error(message="Invalid equipment status", status_code=400)
 
 class CreateEquipmentRequest(BaseModel):
     """Create equipment request"""
@@ -234,10 +273,7 @@ async def create_equipment(
             status_code=201
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        return APIResponse.error(message=str(e), status_code=400)
 
 class UpdateEquipmentRequest(BaseModel):
     """Update equipment request"""
@@ -280,10 +316,7 @@ async def update_equipment(
         )
         
         if not equipment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Equipment not found"
-            )
+            return APIResponse.error(message="Equipment not found", status_code=404)
         
         return APIResponse(
             status="success",
@@ -292,10 +325,7 @@ async def update_equipment(
             status_code=200
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        return APIResponse.error(message=str(e), status_code=400)
 
 @router.delete("/equipment/{equipment_id}", response_model=APIResponse[dict])
 async def delete_equipment(
@@ -312,10 +342,7 @@ async def delete_equipment(
     )
     
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Equipment not found"
-        )
+        return APIResponse.error(message="Equipment not found", status_code=404)
     
     return APIResponse(
         status="success",

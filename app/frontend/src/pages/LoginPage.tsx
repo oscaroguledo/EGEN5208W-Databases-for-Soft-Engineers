@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { User } from '@/data/types';
 import { login } from '@/apis/auth';
+
 interface LoginPageProps {
   onLogin: (user: User) => void;
   onGoRegister: () => void;
@@ -29,8 +30,7 @@ export function LoginPage({ onLogin, onGoRegister }: LoginPageProps) {
         return;
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Invalid email or password.';
-      toast.error(msg);
+      toast.error(err?.response?.data?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }

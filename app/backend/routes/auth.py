@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Optional
 import uuid as _uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,9 +71,9 @@ async def login(
     """
     user = await UserService.authenticate_user(db, login_data.email, login_data.password)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
+        return APIResponse.error(
+            message="Invalid email or password.",
+            status_code=401
         )
 
     access_token  = create_access_token(str(user.id), user.email, user.role.value)
@@ -128,9 +128,9 @@ async def refresh(
 
     user = await UserService.get_user(db, _uuid.UUID(payload["sub"]))
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account not found.",
+        return APIResponse.error(
+            message="User account not found.",
+            status_code=401
         )
 
     new_access_token = create_access_token(str(user.id), user.email, user.role.value)

@@ -112,6 +112,7 @@ export function App() {
             import('@/apis/trainers').then(m => m.listTrainers()),
             adminApi.listEquipment(),
             adminApi.listRooms(),
+            adminApi.listSessions(0, 1000),
           ]);
           if (!mounted) return;
           if (results[0].status === 'fulfilled' && Array.isArray((results[0] as any).value))
@@ -124,6 +125,8 @@ export function App() {
           }
           if (results[3].status === 'fulfilled' && Array.isArray((results[3] as any).value))
             setRooms((results[3] as any).value);
+          if (results[4].status === 'fulfilled' && Array.isArray((results[4] as any).value))
+            setTrainingSessions((results[4] as any).value);
         } else {
           // members and trainers only need rooms (for booking UI)
           const result = await Promise.allSettled([adminApi.listRooms()]);
@@ -183,13 +186,14 @@ export function App() {
     setTrainerAvailability(a => a.filter(x => x.id !== id));
 
   const handleUpdateSession = (s: TrainingSession) =>
-    setTrainingSessions(ss => ss.map(x => x.id === s.id ? s : x));
+    setTrainingSessions(ss => ss.some(x => x.id === s.id) ? ss.map(x => x.id === s.id ? s : x) : [...ss, s]);
   const handleAddSession    = (s: TrainingSession) =>
     setTrainingSessions(ss => [...ss, s]);
 
   const handleBookSession = async (payload: {
     trainer_id: string; room_id: string;
     session_date: string; start_time: string; end_time: string;
+    member_id?: string;
   }) => {
     const { bookSession } = await import('@/apis/members');
     const res = await bookSession(payload);
@@ -249,7 +253,8 @@ export function App() {
             trainers={trainers}
             rooms={rooms}
             onAddSession={handleAddSession}
-            onBookSession={handleBookSession} />
+            onBookSession={handleBookSession}
+            onNavigate={handleNavigate} />
         );
       case 'member-profile':
         return (

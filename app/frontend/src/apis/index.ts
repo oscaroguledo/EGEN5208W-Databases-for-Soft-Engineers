@@ -100,16 +100,53 @@ api.interceptors.response.use(
   }
 );
 
+// ── error message extractor ────────────────────────────────────────────────
+export function extractErrorMessage(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  if (!err) return fallback;
+  const e = err as any;
+
+  // Axios error — response from server
+  const detail = e?.response?.data?.detail;
+  if (detail) {
+    if (typeof detail === 'string') return detail;
+    // FastAPI validation errors: detail is an array of { msg, loc }
+    if (Array.isArray(detail)) {
+      return detail.map((d: any) => d?.msg || String(d)).join(', ');
+    }
+  }
+
+  const msg = e?.response?.data?.message;
+  if (msg && typeof msg === 'string') return msg;
+
+  // Already-extracted message (from handleAxiosResponse throw)
+  if (e?.message && typeof e.message === 'string' && !e.message.startsWith('Request failed')) {
+    return e.message;
+  }
+
+  const status = e?.response?.status;
+  if (status === 400) return 'Invalid request. Please check your details.';
+  if (status === 401) return 'Invalid email or password.';
+  if (status === 403) return 'You do not have permission to do this.';
+  if (status === 404) return 'The requested resource was not found.';
+  if (status === 409) return 'A conflict occurred. This record may already exist.';
+  if (status === 422) return 'Invalid data submitted. Please check all fields.';
+  if (status >= 500) return 'Server error. Please try again later.';
+
+  return fallback;
+}
+
 // ── response unwrapper ─────────────────────────────────────────────────────
 export function handleAxiosResponse(res: any) {
   const data = res?.data;
-  if (!res || res.status >= 400) {
-    throw new Error(
-      (data && (data.detail || data.message)) || res.statusText || 'API error'
-    );
+  const message = data?.message;
+
+  if (!res || res.status >= 400 || res.data?.status === 'error') {
+    const errorMsg = (data && (message || data.detail)) || res.statusText || 'API error';
+    throw new Error(errorMsg);
   }
+
   // Unwrap the standard { status, message, data } envelope
-  return data && data.data !== undefined ? data.data : data;
+  return data?.data ?? data;
 }
 
 export default api;

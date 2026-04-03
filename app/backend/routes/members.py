@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
@@ -6,7 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from core.db import get_db
-from core.auth import require_member, require_admin
+from core.auth import require_member, require_admin, require_any_role
 from core.response import APIResponse, Pagination
 from models.users.user import User, UserRole
 from services.users.members import MemberService
@@ -51,8 +51,22 @@ async def register_member(
             phone=body.phone,
         )
         return APIResponse.success(data=member.to_dict(), message="Member registered successfully.", status_code=201)
+    except ValueError as e:
+        return APIResponse.error(
+            message=str(e),
+            status_code=400
+        )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        err = str(e).lower()
+        if "unique" in err or "duplicate" in err or "already exists" in err:
+            return APIResponse.error(
+                message="An account with this email already exists.",
+                status_code=400
+            )
+        return APIResponse.error(
+            message="Registration failed. Please check your details and try again.",
+            status_code=400
+        )
 
 
 @router.get("/me", response_model=APIResponse[dict])
@@ -62,7 +76,7 @@ async def get_current_member(
 ):
     member = await MemberService.get_member(db, current_user.id)
     if not member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member profile not found")
+        return APIResponse.error(message="Member profile not found", status_code=404)
     return APIResponse.success(data=member.to_dict(), message="Member profile retrieved.")
 
 
@@ -75,7 +89,7 @@ async def update_current_member(
     update_data = {k: v for k, v in body.model_dump().items() if v is not None}
     member = await MemberService.update_member(db, current_user.id, **update_data)
     if not member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member profile not found")
+        return APIResponse.error(message="Member profile not found", status_code=404)
     return APIResponse.success(data=member.to_dict(), message="Member profile updated.")
 
 
@@ -179,7 +193,7 @@ async def enroll_in_class(
         enrollment = await MemberService.enroll_in_class(db=db, member_id=current_user.id, class_id=class_id)
         return APIResponse.success(data={"enrollment_id": str(enrollment.id)}, message="Enrolled in class.", status_code=201)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        return APIResponse.error(message=str(e), status_code=400)
 
 
 @router.delete("/enroll-class/{class_id}", response_model=APIResponse[dict])
@@ -190,7 +204,7 @@ async def cancel_class_enrollment(
 ):
     success = await MemberService.cancel_class_enrollment(db=db, member_id=current_user.id, class_id=class_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+        return APIResponse.error(message="Enrollment not found", status_code=404)
     return APIResponse.success(data={"cancelled": True}, message="Class enrollment cancelled.")
 
 
@@ -201,25 +215,36 @@ async def book_training_session(
     session_date: str,
     start_time: str,
     end_time: str,
-    current_user: User = Depends(require_member),
+    member_id: Optional[UUID] = None,
+    current_user: User = Depends(require_any_role),
     db: AsyncSession = Depends(get_db),
 ):
+    # Admins must supply an explicit member_id; members use their own id
+    if current_user.role == UserRole.admin:
+        if not member_id:
+            return APIResponse.error(message="member_id is required when booking on behalf of a member.", status_code=400)
+        resolved_member_id = member_id
+    else:
+        resolved_member_id = current_user.id
+
     date_obj = datetime.strptime(session_date, "%Y-%m-%d").date()
     start_obj = datetime.strptime(start_time, "%H:%M").time()
     end_obj = datetime.strptime(end_time, "%H:%M").time()
     try:
         session = await MemberService.book_training_session(
             db=db,
-            member_id=current_user.id,
+            member_id=resolved_member_id,
             trainer_id=trainer_id,
             room_id=room_id,
             session_date=date_obj,
             start_time=start_obj,
             end_time=end_obj,
         )
-        return APIResponse.success(data={"session_id": str(session.id)}, message="Training session booked.", status_code=201)
+        return APIResponse.success(data=session.to_dict(), message="Training session booked.", status_code=201)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        return APIResponse.error(message=str(e), status_code=400)
+    except Exception as e:
+        return APIResponse.error(message="Failed to book session. Please try again.", status_code=500)
 
 
 @router.delete("/book-session/{session_id}", response_model=APIResponse[dict])
@@ -230,7 +255,7 @@ async def cancel_training_session(
 ):
     success = await MemberService.cancel_training_session(db=db, member_id=current_user.id, session_id=session_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found or cannot be cancelled")
+        return APIResponse.error(message="Session not found or cannot be cancelled", status_code=404)
     return APIResponse.success(data={"cancelled": True}, message="Training session cancelled.")
 
 
