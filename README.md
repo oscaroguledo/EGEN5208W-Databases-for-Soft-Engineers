@@ -10,7 +10,7 @@ A web-based application for managing health and fitness club operations, includi
 
 ## 📺 Video Demonstration
 
-**Video Link**: [Watch Demo](https://drive.google.com/file/d/1YMU7w37ZKegMAr81cq36krGsifjyclEA/view?usp=drive_link)
+**Video Link**: [Watch Demo](https://drive.google.com/file/d/1_cWLrs1dNea3omdEmO-paZKeXOP6ixJ6/view?usp=drive_link)
 
 The video demonstrates all 8 required operations:
 - ✅ Member: User Registration, Profile Management, Health History, Dashboard
