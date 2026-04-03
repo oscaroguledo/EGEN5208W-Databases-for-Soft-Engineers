@@ -26,22 +26,38 @@ class AdminStaffService:
             await db.execute(select(TrainingSession).where(TrainingSession.id == session_id))
         ).scalar_one_or_none()
         if not session:
-            return None
+            raise ValueError("Training session not found")
 
         if check_conflicts:
-            conflict_q = select(TrainingSession).where(
+            overlap = or_(
+                and_(TrainingSession.start_time <= session.start_time, TrainingSession.end_time > session.start_time),
+                and_(TrainingSession.start_time < session.end_time, TrainingSession.end_time >= session.end_time),
+                and_(TrainingSession.start_time >= session.start_time, TrainingSession.end_time <= session.end_time),
+            )
+            # Check against other training sessions
+            session_conflict = select(TrainingSession).where(
                 TrainingSession.room_id == room_id,
                 TrainingSession.session_date == session.session_date,
                 TrainingSession.status == SessionStatus.scheduled,
                 TrainingSession.id != session_id,
-                or_(
-                    and_(TrainingSession.start_time <= session.start_time, TrainingSession.end_time > session.start_time),
-                    and_(TrainingSession.start_time < session.end_time, TrainingSession.end_time >= session.end_time),
-                    and_(TrainingSession.start_time >= session.start_time, TrainingSession.end_time <= session.end_time),
-                ),
+                overlap,
             )
-            if (await db.execute(conflict_q)).scalars().first():
-                raise ValueError(f"Room {room_id} is already booked during this time slot")
+            if (await db.execute(session_conflict)).scalars().first():
+                raise ValueError(f"Room is already booked by another session during this time slot")
+
+            # Check against group classes
+            class_overlap = or_(
+                and_(Class.start_time <= session.start_time, Class.end_time > session.start_time),
+                and_(Class.start_time < session.end_time, Class.end_time >= session.end_time),
+                and_(Class.start_time >= session.start_time, Class.end_time <= session.end_time),
+            )
+            class_conflict = select(Class).where(
+                Class.room_id == room_id,
+                Class.class_date == session.session_date,
+                class_overlap,
+            )
+            if (await db.execute(class_conflict)).scalars().first():
+                raise ValueError(f"Room is already booked by a group class during this time slot")
 
         result = await db.execute(
             update(TrainingSession)
@@ -51,6 +67,53 @@ class AdminStaffService:
         )
         await db.commit()
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def assign_room_to_class(
+        db: AsyncSession,
+        class_id: UUID,
+        room_id: UUID,
+    ) -> Class:
+        class_obj = (
+            await db.execute(select(Class).where(Class.id == class_id))
+        ).scalar_one_or_none()
+        if not class_obj:
+            raise ValueError("Class not found")
+
+        overlap = or_(
+            and_(Class.start_time <= class_obj.start_time, Class.end_time > class_obj.start_time),
+            and_(Class.start_time < class_obj.end_time, Class.end_time >= class_obj.end_time),
+            and_(Class.start_time >= class_obj.start_time, Class.end_time <= class_obj.end_time),
+        )
+        # Check against other classes
+        class_conflict = select(Class).where(
+            Class.room_id == room_id,
+            Class.class_date == class_obj.class_date,
+            Class.id != class_id,
+            overlap,
+        )
+        if (await db.execute(class_conflict)).scalars().first():
+            raise ValueError("Room is already booked by another class during this time slot")
+
+        # Check against training sessions
+        session_overlap = or_(
+            and_(TrainingSession.start_time <= class_obj.start_time, TrainingSession.end_time > class_obj.start_time),
+            and_(TrainingSession.start_time < class_obj.end_time, TrainingSession.end_time >= class_obj.end_time),
+            and_(TrainingSession.start_time >= class_obj.start_time, TrainingSession.end_time <= class_obj.end_time),
+        )
+        session_conflict = select(TrainingSession).where(
+            TrainingSession.room_id == room_id,
+            TrainingSession.session_date == class_obj.class_date,
+            TrainingSession.status == SessionStatus.scheduled,
+            session_overlap,
+        )
+        if (await db.execute(session_conflict)).scalars().first():
+            raise ValueError("Room is already booked by a training session during this time slot")
+
+        class_obj.room_id = room_id
+        await db.commit()
+        await db.refresh(class_obj)
+        return class_obj
 
     @staticmethod
     async def schedule_class_with_room(

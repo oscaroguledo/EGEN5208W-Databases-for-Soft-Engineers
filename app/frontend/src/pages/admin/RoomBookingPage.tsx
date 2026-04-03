@@ -77,19 +77,18 @@ export function RoomBookingPage({
     setAssigning(true);
     try {
       if (targetType === 'session') {
-        await adminApi.assignRoomToSession(targetId, selectedRoomId);
-        const s = trainingSessions.find(x => x.id === targetId);
-        if (s) onUpdateSession({ ...s, room_id: selectedRoomId });
+        const updated = await adminApi.assignRoomToSession(targetId, selectedRoomId);
+        onUpdateSession(updated as TrainingSession);
         toast.success('Room assigned to session.');
       } else {
-        await adminApi.assignRoomToClass(targetId, selectedRoomId);
-        const c = groupClasses.find(x => x.id === targetId);
-        if (c) onUpdateClass({ ...c, room_id: selectedRoomId });
+        const updated = await adminApi.assignRoomToClass(targetId, selectedRoomId);
+        onUpdateClass(updated as GroupClass);
         toast.success('Room assigned to class.');
       }
       setTargetId(''); setSelectedRoomId('');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to assign room.');
+      const msg = err?.message || err?.response?.data?.message || 'Failed to assign room.';
+      toast.error(msg);
     }
     setAssigning(false);
   };

@@ -78,11 +78,10 @@ async def assign_room_to_session(
             session_id=session_id,
             room_id=data.room_id
         )
-        
         return APIResponse(
             status="success",
             message="Room assigned to session",
-            data={"session_id": str(session.id), "room_id": str(data.room_id)},
+            data=session.to_dict(),
             status_code=200
         )
     except ValueError as e:
@@ -96,48 +95,20 @@ async def assign_room_to_class(
     db: AsyncSession = Depends(get_db)
 ):
     """Assign or modify room for fitness class"""
-    from sqlalchemy.future import select as sa_select
-    from sqlalchemy import update as sa_update
-    from models.trainings import Class as ClassModel
-    
-    # Get the class
-    result = await db.execute(
-        sa_select(ClassModel).where(ClassModel.id == class_id)
-    )
-    class_obj = result.scalar_one_or_none()
-    
-    if not class_obj:
-        return APIResponse.error(message="Class not found", status_code=404)
-    
-    # Check for room conflicts
-    conflict_q = sa_select(ClassModel).where(
-        ClassModel.room_id == data.room_id,
-        ClassModel.class_date == class_obj.class_date,
-        ClassModel.id != class_id,
-        or_(
-            and_(ClassModel.start_time <= class_obj.start_time, ClassModel.end_time > class_obj.start_time),
-            and_(ClassModel.start_time < class_obj.end_time, ClassModel.end_time >= class_obj.end_time),
-            and_(ClassModel.start_time >= class_obj.start_time, ClassModel.end_time <= class_obj.end_time),
-        ),
-    )
-    conflict_result = await db.execute(conflict_q)
-    if conflict_result.scalars().first():
-        return APIResponse.error(
-            message=f"Room is already booked during this time slot",
-            status_code=409
+    try:
+        class_obj = await AdminStaffService.assign_room_to_class(
+            db=db,
+            class_id=class_id,
+            room_id=data.room_id,
         )
-    
-    # Update room assignment
-    class_obj.room_id = data.room_id
-    await db.commit()
-    await db.refresh(class_obj)
-    
-    return APIResponse(
-        status="success",
-        message="Room assigned to class",
-        data={"class_id": str(class_obj.id), "room_id": str(data.room_id)},
-        status_code=200
-    )
+        return APIResponse(
+            status="success",
+            message="Room assigned to class",
+            data=class_obj.to_dict(),
+            status_code=200
+        )
+    except ValueError as e:
+        return APIResponse.error(message=str(e), status_code=409)
 
 @router.get("/equipment", response_model=APIResponse[List])
 async def list_equipment_paginated(
